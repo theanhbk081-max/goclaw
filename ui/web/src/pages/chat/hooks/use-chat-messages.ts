@@ -144,18 +144,20 @@ export function useChatMessages(sessionKey: string, agentId: string) {
         }
         case "tool.result": {
           const isError = event.payload?.is_error;
-          setToolStream((prev) =>
-            prev.map((t) =>
-              t.toolCallId === event.payload?.id
-                ? {
-                    ...t,
-                    phase: isError ? "error" : "completed",
-                    errorContent: isError ? event.payload?.content : undefined,
-                    updatedAt: Date.now(),
-                  }
-                : t,
-            ),
+          const resultId = event.payload?.id;
+          const now = Date.now();
+          // Update ref first so subsequent tool.call events don't overwrite with stale data.
+          toolStreamRef.current = toolStreamRef.current.map((t) =>
+            t.toolCallId === resultId
+              ? {
+                  ...t,
+                  phase: isError ? ("error" as const) : ("completed" as const),
+                  errorContent: isError ? event.payload?.content : undefined,
+                  updatedAt: now,
+                }
+              : t,
           );
+          setToolStream(toolStreamRef.current);
           break;
         }
         case "run.completed": {
