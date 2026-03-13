@@ -277,6 +277,7 @@ func (l *Loop) enrichImageIDs(messages []providers.Message, refs []providers.Med
 		bare := "<media:image>"
 		if idx := strings.LastIndex(content, bare); idx >= 0 {
 			content = content[:idx] + "<media:image" + idAttr + ">" + content[idx+len(bare):]
+			continue
 		}
 	}
 	messages[lastIdx].Content = content
