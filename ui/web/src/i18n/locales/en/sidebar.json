@@ -35,6 +35,7 @@
     "approvals": "Approvals",
     "nodes": "Nodes",
     "tts": "TTS",
-    "activity": "Activity"
+    "activity": "Activity",
+    "apiKeys": "API Keys"
   }
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/nextlevelbuilder/goclaw/internal/crypto"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
 	"github.com/nextlevelbuilder/goclaw/internal/permissions"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -99,13 +100,32 @@ func (r *MethodRouter) handleConnect(ctx context.Context, client *Client, req *p
 
 	configToken := r.server.cfg.Gateway.Token
 
-	// Path 1: Valid token → admin
+	// Path 1: Valid gateway token → admin
 	if configToken != "" && params.Token == configToken {
 		client.role = permissions.RoleAdmin
 		client.authenticated = true
 		client.userID = params.UserID
 		r.sendConnectResponse(client, req.ID)
 		return
+	}
+
+	// Path 1b: API key → role derived from scopes
+	if params.Token != "" && r.server.apiKeyStore != nil {
+		hash := crypto.HashAPIKey(params.Token)
+		keyData, err := r.server.apiKeyStore.GetByHash(ctx, hash)
+		if err == nil && keyData != nil {
+			scopes := make([]permissions.Scope, len(keyData.Scopes))
+			for i, s := range keyData.Scopes {
+				scopes[i] = permissions.Scope(s)
+			}
+			client.role = permissions.RoleFromScopes(scopes)
+			client.scopes = scopes
+			client.authenticated = true
+			client.userID = params.UserID
+			go r.server.apiKeyStore.TouchLastUsed(context.Background(), keyData.ID)
+			r.sendConnectResponse(client, req.ID)
+			return
+		}
 	}
 
 	// Path 2: No token configured → operator (backward compat)

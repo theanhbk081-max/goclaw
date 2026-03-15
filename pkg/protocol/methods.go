@@ -135,6 +135,13 @@ const (
 	MethodDelegationsGet  = "delegations.get"
 )
 
+// API key management
+const (
+	MethodAPIKeysList   = "api_keys.list"
+	MethodAPIKeysCreate = "api_keys.create"
+	MethodAPIKeysRevoke = "api_keys.revoke"
+)
+
 // Phase 3+ - NICE TO HAVE methods
 const (
 	MethodLogsTail = "logs.tail"

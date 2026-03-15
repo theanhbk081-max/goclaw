@@ -35,6 +35,7 @@
     "approvals": "Phê duyệt",
     "nodes": "Nodes",
     "tts": "TTS",
-    "activity": "Hoạt động"
+    "activity": "Hoạt động",
+    "apiKeys": "API Keys"
   }
 }

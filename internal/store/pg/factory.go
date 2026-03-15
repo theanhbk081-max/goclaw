@@ -44,5 +44,6 @@ func NewPGStores(cfg store.StoreConfig) (*store.Stores, error) {
 		Contacts:         NewPGContactStore(db),
 		Activity:         NewPGActivityStore(db),
 		Snapshots:        NewPGSnapshotStore(db),
+		APIKeys:          NewPGAPIKeyStore(db),
 	}, nil
 }

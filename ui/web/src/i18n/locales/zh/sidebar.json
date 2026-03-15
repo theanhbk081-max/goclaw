@@ -35,6 +35,7 @@
     "traces": "追踪",
     "tts": "TTS",
     "usage": "用量",
-    "activity": "活动日志"
+    "activity": "活动日志",
+    "apiKeys": "API 密钥"
   }
 }

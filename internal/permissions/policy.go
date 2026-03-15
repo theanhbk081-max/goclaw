@@ -159,6 +159,9 @@ func isAdminMethod(method string) bool {
 		protocol.MethodTeamsTaskGet,
 		protocol.MethodTeamsTaskComments,
 		protocol.MethodTeamsTaskEvents,
+		protocol.MethodAPIKeysList,
+		protocol.MethodAPIKeysCreate,
+		protocol.MethodAPIKeysRevoke,
 	}
 	return slices.Contains(adminMethods, method)
 }

@@ -739,6 +739,12 @@ func runGateway() {
 		server.SetUsageHandler(httpapi.NewUsageHandler(pgStores.Snapshots, pgStores.DB, cfg.Gateway.Token))
 	}
 
+	// API key management
+	if pgStores != nil && pgStores.APIKeys != nil {
+		server.SetAPIKeysHandler(httpapi.NewAPIKeysHandler(pgStores.APIKeys, cfg.Gateway.Token, msgBus))
+		server.SetAPIKeyStore(pgStores.APIKeys)
+	}
+
 	// Memory management API (wired directly, only needs MemoryStore + token)
 	if pgStores != nil && pgStores.Memory != nil {
 		server.SetMemoryHandler(httpapi.NewMemoryHandler(pgStores.Memory, cfg.Gateway.Token))
@@ -980,6 +986,11 @@ func runGateway() {
 	// Register quota usage RPC.
 	// Pass DB so summary cards still work when quota is disabled (queries traces directly).
 	methods.NewQuotaMethods(quotaChecker, pgStores.DB).Register(server.Router())
+
+	// API key management RPC
+	if pgStores.APIKeys != nil {
+		methods.NewAPIKeysMethods(pgStores.APIKeys).Register(server.Router())
+	}
 
 	// Reload quota config on config changes via pub/sub.
 	if quotaChecker != nil {

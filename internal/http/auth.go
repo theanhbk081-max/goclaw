@@ -1,12 +1,15 @@
 package http
 
 import (
+	"context"
 	"crypto/subtle"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/nextlevelbuilder/goclaw/internal/crypto"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
+	"github.com/nextlevelbuilder/goclaw/internal/permissions"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
 
@@ -66,6 +69,25 @@ func extractAgentID(r *http.Request, model string) string {
 	}
 
 	return "default"
+}
+
+// resolveAPIKey checks if the bearer token is a valid API key.
+// Returns the key data and derived role, or nil if not found/expired/revoked.
+func resolveAPIKey(ctx context.Context, token string, apiKeys store.APIKeyStore) (*store.APIKeyData, permissions.Role) {
+	if apiKeys == nil || token == "" {
+		return nil, ""
+	}
+	hash := crypto.HashAPIKey(token)
+	key, err := apiKeys.GetByHash(ctx, hash)
+	if err != nil || key == nil {
+		return nil, ""
+	}
+	scopes := make([]permissions.Scope, len(key.Scopes))
+	for i, s := range key.Scopes {
+		scopes[i] = permissions.Scope(s)
+	}
+	go apiKeys.TouchLastUsed(context.Background(), key.ID)
+	return key, permissions.RoleFromScopes(scopes)
 }
 
 // extractLocale parses the Accept-Language header and returns a supported locale.

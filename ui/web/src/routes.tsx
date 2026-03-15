@@ -90,6 +90,9 @@ const ContactsPage = lazy(() =>
 const ActivityPage = lazy(() =>
   import("@/pages/activity/activity-page").then((m) => ({ default: m.ActivityPage })),
 );
+const ApiKeysPage = lazy(() =>
+  import("@/pages/api-keys/api-keys-page").then((m) => ({ default: m.ApiKeysPage })),
+);
 
 function PageLoader() {
   return (
@@ -161,6 +164,7 @@ export function AppRoutes() {
           <Route path={ROUTES.PENDING_MESSAGES} element={<PendingMessagesPage />} />
           <Route path={ROUTES.MEMORY} element={<MemoryPage />} />
           <Route path={ROUTES.KNOWLEDGE_GRAPH} element={<KnowledgeGraphPage />} />
+          <Route path={ROUTES.API_KEYS} element={<ApiKeysPage />} />
         </Route>
 
         {/* Catch-all → overview */}
