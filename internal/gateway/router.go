@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"time"
@@ -100,8 +101,8 @@ func (r *MethodRouter) handleConnect(ctx context.Context, client *Client, req *p
 
 	configToken := r.server.cfg.Gateway.Token
 
-	// Path 1: Valid gateway token → admin
-	if configToken != "" && params.Token == configToken {
+	// Path 1: Valid gateway token → admin (constant-time comparison)
+	if configToken != "" && subtle.ConstantTimeCompare([]byte(params.Token), []byte(configToken)) == 1 {
 		client.role = permissions.RoleAdmin
 		client.authenticated = true
 		client.userID = params.UserID

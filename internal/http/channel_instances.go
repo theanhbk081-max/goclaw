@@ -54,12 +54,10 @@ func (h *ChannelInstancesHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *ChannelInstancesHandler) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.token != "" {
-			if extractBearerToken(r) != h.token {
-				locale := extractLocale(r)
-				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
-				return
-			}
+		if !tryAuth(r, h.token) {
+			locale := extractLocale(r)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
+			return
 		}
 		userID := extractUserID(r)
 		ctx := store.WithLocale(r.Context(), extractLocale(r))

@@ -108,8 +108,9 @@ func RoleFromScopes(scopes []Scope) Role {
 	if slices.Contains(scopes, ScopeAdmin) {
 		return RoleAdmin
 	}
-	hasWrite := slices.Contains(scopes, ScopeWrite)
-	if hasWrite {
+	if slices.Contains(scopes, ScopeWrite) ||
+		slices.Contains(scopes, ScopeApprovals) ||
+		slices.Contains(scopes, ScopePairing) {
 		return RoleOperator
 	}
 	if slices.Contains(scopes, ScopeRead) {
@@ -209,6 +210,11 @@ func isWriteMethod(method string) bool {
 		}
 	}
 	return false
+}
+
+// HasMinRole checks if the given role meets the minimum required level.
+func HasMinRole(role, required Role) bool {
+	return roleLevel(role) >= roleLevel(required)
 }
 
 func roleLevel(r Role) int {

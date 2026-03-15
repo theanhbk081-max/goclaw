@@ -46,11 +46,9 @@ func (h *ToolsInvokeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.token != "" {
-		if extractBearerToken(r) != h.token {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
-			return
-		}
+	if !tryAuth(r, h.token) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
+		return
 	}
 
 	var req toolsInvokeRequest

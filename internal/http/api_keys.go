@@ -97,6 +97,10 @@ func (h *APIKeysHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgRequired, "name")})
 		return
 	}
+	if len(input.Name) > 100 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgInvalidRequest, "name must be 100 characters or less")})
+		return
+	}
 	if len(input.Scopes) == 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgRequired, "scopes")})
 		return

@@ -90,6 +90,34 @@ func resolveAPIKey(ctx context.Context, token string, apiKeys store.APIKeyStore)
 	return key, permissions.RoleFromScopes(scopes)
 }
 
+// --- Package-level API key store for shared auth ---
+
+var pkgAPIKeyStore store.APIKeyStore
+
+// SetPackageAPIKeyStore sets the API key store used by all HTTP handler auth checks.
+// Must be called once during server startup before handling requests.
+func SetPackageAPIKeyStore(s store.APIKeyStore) {
+	pkgAPIKeyStore = s
+}
+
+// tryAuth checks if the request is authenticated via gateway token or API key.
+// Returns true if: token matches, API key is valid, or no auth is configured (token=="").
+func tryAuth(r *http.Request, token string) bool {
+	return tryAuthBearer(r, token, extractBearerToken(r))
+}
+
+// tryAuthBearer is like tryAuth but accepts a pre-extracted bearer token.
+// Useful for handlers that also accept tokens from query params.
+func tryAuthBearer(r *http.Request, token, bearer string) bool {
+	if token != "" && tokenMatch(bearer, token) {
+		return true
+	}
+	if key, _ := resolveAPIKey(r.Context(), bearer, pkgAPIKeyStore); key != nil {
+		return true
+	}
+	return token == ""
+}
+
 // extractLocale parses the Accept-Language header and returns a supported locale.
 // Falls back to "en" if no supported language is found.
 func extractLocale(r *http.Request) string {

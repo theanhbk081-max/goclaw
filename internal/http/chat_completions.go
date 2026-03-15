@@ -82,8 +82,8 @@ func (h *ChatCompletionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Auth check (timing-safe comparison)
-	if !tokenMatch(extractBearerToken(r), h.token) {
+	// Auth check (gateway token or API key)
+	if !tryAuth(r, h.token) {
 		http.Error(w, fmt.Sprintf(`{"error":{"message":"%s","type":"invalid_request_error"}}`, i18n.T(locale, i18n.MsgInvalidAuth)), http.StatusUnauthorized)
 		return
 	}

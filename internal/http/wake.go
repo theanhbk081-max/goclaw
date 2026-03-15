@@ -53,8 +53,8 @@ type wakeUsage struct {
 func (h *WakeHandler) handleWake(w http.ResponseWriter, r *http.Request) {
 	locale := extractLocale(r)
 
-	// Auth check
-	if h.token != "" && !tokenMatch(extractBearerToken(r), h.token) {
+	// Auth check (gateway token or API key)
+	if !tryAuth(r, h.token) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
 		return
 	}

@@ -29,17 +29,15 @@ func (h *FilesHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *FilesHandler) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.token != "" {
-			// Accept token via Bearer header or ?token= query param (for <img src>).
-			provided := extractBearerToken(r)
-			if provided == "" {
-				provided = r.URL.Query().Get("token")
-			}
-			if provided != h.token {
-				locale := extractLocale(r)
-				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
-				return
-			}
+		// Accept token via Bearer header or ?token= query param (for <img src>).
+		provided := extractBearerToken(r)
+		if provided == "" {
+			provided = r.URL.Query().Get("token")
+		}
+		if !tryAuthBearer(r, h.token, provided) {
+			locale := extractLocale(r)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
+			return
 		}
 		next(w, r)
 	}

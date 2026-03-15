@@ -750,6 +750,7 @@ func runGateway() {
 	if pgStores != nil && pgStores.APIKeys != nil {
 		server.SetAPIKeysHandler(httpapi.NewAPIKeysHandler(pgStores.APIKeys, cfg.Gateway.Token, msgBus))
 		server.SetAPIKeyStore(pgStores.APIKeys)
+		httpapi.SetPackageAPIKeyStore(pgStores.APIKeys)
 	}
 
 	// Memory management API (wired directly, only needs MemoryStore + token)

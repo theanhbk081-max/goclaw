@@ -43,8 +43,8 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auth check (timing-safe comparison)
-	if !tokenMatch(extractBearerToken(r), h.token) {
+	// Auth check (gateway token or API key)
+	if !tryAuth(r, h.token) {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return
 	}

@@ -26,12 +26,10 @@ func (h *ActivityHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *ActivityHandler) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.token != "" {
-			if extractBearerToken(r) != h.token {
-				locale := extractLocale(r)
-				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
-				return
-			}
+		if !tryAuth(r, h.token) {
+			locale := extractLocale(r)
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": i18n.T(locale, i18n.MsgUnauthorized)})
+			return
 		}
 		locale := extractLocale(r)
 		ctx := store.WithLocale(r.Context(), locale)
