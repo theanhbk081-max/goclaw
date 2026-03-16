@@ -224,8 +224,8 @@ func MemoryConfigFromCtx(ctx context.Context) *config.MemoryConfig {
 
 const ctxTeamID toolContextKey = "tool_team_id"
 
-// WithToolTeamID injects the dispatching team's ID into context so workspace
-// tools (workspace_read, workspace_write, team_tasks, team_message) resolve
+// WithToolTeamID injects the dispatching team's ID into context so team
+// tools (team_tasks, team_message) and the WorkspaceInterceptor resolve
 // the correct team when the agent belongs to multiple teams.
 func WithToolTeamID(ctx context.Context, teamID string) context.Context {
 	return context.WithValue(ctx, ctxTeamID, teamID)
@@ -234,6 +234,22 @@ func WithToolTeamID(ctx context.Context, teamID string) context.Context {
 // ToolTeamIDFromCtx returns the dispatching team's ID from context.
 func ToolTeamIDFromCtx(ctx context.Context) string {
 	v, _ := ctx.Value(ctxTeamID).(string)
+	return v
+}
+
+// --- Team workspace path (accessible but not default) ---
+
+const ctxTeamWorkspace toolContextKey = "tool_team_workspace"
+
+// WithToolTeamWorkspace stores the team shared workspace directory path.
+// File tools allow access to this path even when restrict_to_workspace is true.
+func WithToolTeamWorkspace(ctx context.Context, dir string) context.Context {
+	return context.WithValue(ctx, ctxTeamWorkspace, dir)
+}
+
+// ToolTeamWorkspaceFromCtx returns the team shared workspace directory path.
+func ToolTeamWorkspaceFromCtx(ctx context.Context) string {
+	v, _ := ctx.Value(ctxTeamWorkspace).(string)
 	return v
 }
 
