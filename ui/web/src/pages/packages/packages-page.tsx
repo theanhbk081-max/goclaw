@@ -14,7 +14,7 @@ export function PackagesPage() {
   const { runtimes, loading: runtimesLoading, refresh: refreshRuntimes } = usePackageRuntimes();
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <PageHeader
         title={t("title")}
         description={t("description")}

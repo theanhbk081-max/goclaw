@@ -20,13 +20,19 @@ export NODE_PATH="/usr/local/lib/node_modules:$RUNTIME_DIR/npm-global/lib/node_m
 export PATH="$RUNTIME_DIR/npm-global/bin:$RUNTIME_DIR/pip/bin:$PATH"
 
 # System packages: re-install on-demand packages persisted across recreates.
-# dep_installer.go appends package names to this file via doas apk add.
+# Runs as root (entrypoint) — no doas needed.
 APK_LIST="$RUNTIME_DIR/apk-packages"
 if [ -f "$APK_LIST" ] && [ -s "$APK_LIST" ]; then
   echo "Re-installing persisted system packages..."
   # shellcheck disable=SC2046
-  doas apk add --no-cache $(cat "$APK_LIST" | sort -u) 2>/dev/null || \
+  apk add --no-cache $(cat "$APK_LIST" | sort -u) 2>/dev/null || \
     echo "Warning: some packages failed to install"
+fi
+
+# Start the root-privileged package helper (listens on /tmp/pkg.sock).
+# It handles runtime apk install/uninstall requests from the non-root app process.
+if [ -x /app/pkg-helper ]; then
+  /app/pkg-helper &
 fi
 
 case "${1:-serve}" in
@@ -34,26 +40,26 @@ case "${1:-serve}" in
     # Auto-upgrade (schema migrations + data hooks) before starting.
     if [ -n "$GOCLAW_POSTGRES_DSN" ]; then
       echo "Running database upgrade..."
-      /app/goclaw upgrade || \
+      su-exec goclaw /app/goclaw upgrade || \
         echo "Upgrade warning (may already be up-to-date)"
     fi
-    exec /app/goclaw
+    exec su-exec goclaw /app/goclaw
     ;;
   upgrade)
     shift
-    exec /app/goclaw upgrade "$@"
+    exec su-exec goclaw /app/goclaw upgrade "$@"
     ;;
   migrate)
     shift
-    exec /app/goclaw migrate "$@"
+    exec su-exec goclaw /app/goclaw migrate "$@"
     ;;
   onboard)
-    exec /app/goclaw onboard
+    exec su-exec goclaw /app/goclaw onboard
     ;;
   version)
-    exec /app/goclaw version
+    exec su-exec goclaw /app/goclaw version
     ;;
   *)
-    exec /app/goclaw "$@"
+    exec su-exec goclaw /app/goclaw "$@"
     ;;
 esac
