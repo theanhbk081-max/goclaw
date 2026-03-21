@@ -13,11 +13,13 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/media"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/typing"
+	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
 
 // handleMessage processes incoming Discord messages.
 func (c *Channel) handleMessage(_ *discordgo.Session, m *discordgo.MessageCreate) {
 	ctx := context.Background()
+	ctx = store.WithTenantID(ctx, c.TenantID())
 	// Ignore bot's own messages
 	if m.Author == nil || m.Author.ID == c.botUserID {
 		return

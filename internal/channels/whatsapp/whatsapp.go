@@ -205,6 +205,7 @@ func (c *Channel) listenLoop() {
 // Expected format: {"type":"message","from":"...","chat":"...","content":"...","id":"...","from_name":"...","media":[...]}
 func (c *Channel) handleIncomingMessage(msg map[string]any) {
 	ctx := context.Background()
+	ctx = store.WithTenantID(ctx, c.TenantID())
 	senderID, ok := msg["from"].(string)
 	if !ok || senderID == "" {
 		return
