@@ -61,36 +61,37 @@ function ApiKeyCard({
 
   return (
     <Card className="py-0 gap-0">
-      <CardContent className="px-3 py-2">
-        <div className="flex items-center justify-between gap-3">
+      <CardContent className="px-4 py-3.5">
+        <div className="flex items-start justify-between gap-4">
           {/* Left: name + meta */}
-          <div className="min-w-0 flex-1 space-y-0.5">
-            {/* Row 1: name + prefix + status + tenant */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm truncate">{apiKey.name}</span>
-              <code className="text-[10px] text-muted-foreground font-mono">{apiKey.prefix}...***</code>
-              <Badge variant={status.variant} className="text-[10px] shrink-0">{status.label}</Badge>
+          <div className="min-w-0 flex-1 space-y-2">
+            {/* Row 1: name + status + tenant */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="font-semibold text-sm">{apiKey.name}</span>
+              <code className="text-xs text-muted-foreground font-mono">{apiKey.prefix}...***</code>
+              <Badge variant={status.variant} className="text-xs shrink-0">{status.label}</Badge>
               {isCrossTenant && (
-                <Badge variant="outline" className="text-[10px] shrink-0 gap-0.5">
-                  <Building2 className="h-2.5 w-2.5" />
+                <Badge variant="outline" className="text-xs shrink-0 gap-1">
+                  <Building2 className="h-3 w-3" />
                   {tenantName}
                 </Badge>
               )}
             </div>
 
-            {/* Row 2: scopes + dates */}
-            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Shield className="h-3 w-3 shrink-0" />
-                {apiKey.scopes.map((s) => (
-                  <Badge key={s} variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
-                    {s.replace("operator.", "")}
-                  </Badge>
-                ))}
-              </div>
-              <span className="text-muted-foreground/50">·</span>
+            {/* Row 2: scopes */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              {apiKey.scopes.map((s) => (
+                <Badge key={s} variant="secondary" className="text-xs font-mono px-2 py-0.5">
+                  {s.replace("operator.", "")}
+                </Badge>
+              ))}
+            </div>
+
+            {/* Row 3: dates */}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1" title={fullDateTime(apiKey.created_at)}>
-                <Clock className="h-3 w-3" />
+                <Clock className="h-3.5 w-3.5" />
                 {formatRelativeTime(apiKey.created_at)}
               </span>
               <span title={apiKey.last_used_at ? fullDateTime(apiKey.last_used_at) : undefined}>
@@ -105,10 +106,10 @@ function ApiKeyCard({
               variant="ghost"
               size="icon"
               onClick={onRevoke}
-              className="text-muted-foreground hover:text-destructive shrink-0 h-7 w-7"
+              className="text-muted-foreground hover:text-destructive shrink-0 h-8 w-8"
               title={t("revoke.confirmLabel")}
             >
-              <Ban className="h-3.5 w-3.5" />
+              <Ban className="h-4 w-4" />
             </Button>
           )}
         </div>
@@ -186,7 +187,7 @@ export function ApiKeysPage() {
           <EmptyState icon={Key} title={t("emptyTitle")} description={t("emptyDescription")} />
         ) : (
           <>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {pageItems.map((key) => (
                 <ApiKeyCard
                   key={key.id}
@@ -198,7 +199,7 @@ export function ApiKeysPage() {
                 />
               ))}
             </div>
-            <Pagination {...pagination} onPageChange={setPage} onPageSizeChange={setPageSize} />
+            <Pagination {...pagination} onPageChange={setPage} onPageSizeChange={setPageSize} className="border-t-0" />
           </>
         )}
       </div>

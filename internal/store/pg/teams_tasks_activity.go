@@ -32,7 +32,7 @@ func (s *PGTeamStore) AddTaskComment(ctx context.Context, comment *store.TeamTas
 	}
 	// Increment denormalized comment count.
 	_, _ = s.db.ExecContext(ctx,
-		`UPDATE team_tasks SET comment_count = comment_count + 1 WHERE id = $1`, comment.TaskID)
+		`UPDATE team_tasks SET comment_count = comment_count + 1 WHERE id = $1 AND tenant_id = $2`, comment.TaskID, tenantIDForInsert(ctx))
 	return nil
 }
 
@@ -208,7 +208,7 @@ func (s *PGTeamStore) AttachFileToTask(ctx context.Context, att *store.TeamTaskA
 	// Increment denormalized count only if a row was actually inserted (not conflict).
 	if n, _ := res.RowsAffected(); n > 0 {
 		_, _ = s.db.ExecContext(ctx,
-			`UPDATE team_tasks SET attachment_count = attachment_count + 1 WHERE id = $1`, att.TaskID)
+			`UPDATE team_tasks SET attachment_count = attachment_count + 1 WHERE id = $1 AND tenant_id = $2`, att.TaskID, tenantIDForInsert(ctx))
 	}
 	return nil
 }
@@ -281,7 +281,7 @@ func (s *PGTeamStore) DetachFileFromTask(ctx context.Context, taskID uuid.UUID, 
 	// Decrement denormalized count only if a row was actually deleted.
 	if n, _ := res.RowsAffected(); n > 0 {
 		_, _ = s.db.ExecContext(ctx,
-			`UPDATE team_tasks SET attachment_count = GREATEST(attachment_count - 1, 0) WHERE id = $1`, taskID)
+			`UPDATE team_tasks SET attachment_count = GREATEST(attachment_count - 1, 0) WHERE id = $1 AND tenant_id = $2`, taskID, tid)
 	}
 	return nil
 }
