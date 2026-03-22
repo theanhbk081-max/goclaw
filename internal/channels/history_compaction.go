@@ -37,8 +37,7 @@ func (ph *PendingHistory) MaybeCompact(historyKey string, currentCount int, cfg 
 	// RAM count may be stale after restart (LoadFromDB doesn't warm full history).
 	// If RAM says below threshold, ask DB for the real count.
 	if currentCount <= threshold {
-		// TODO: inject tenant context for multi-tenant (requires tenantID field on PendingHistory)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(ph.tenantCtx(), 10*time.Second)
 		defer cancel()
 		dbCount, err := ph.store.CountByKey(ctx, ph.channelName, historyKey)
 		if err != nil || dbCount <= threshold {
@@ -138,8 +137,7 @@ func (ph *PendingHistory) runCompaction(historyKey string, cfg *CompactionConfig
 	// Force-flush buffer to ensure DB is consistent
 	ph.flushNow()
 
-	// TODO: inject tenant context for multi-tenant (requires tenantID field on PendingHistory)
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	ctx, cancel := context.WithTimeout(ph.tenantCtx(), 180*time.Second)
 	defer cancel()
 
 	// Check threshold from DB (may have been cleared since trigger)

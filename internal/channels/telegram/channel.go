@@ -122,7 +122,7 @@ func New(cfg config.TelegramConfig, msgBus *bus.MessageBus, pairingSvc store.Pai
 		agentStore:      agentStore,
 		configPermStore: configPermStore,
 		teamStore:       teamStore,
-		groupHistory:    channels.MakeHistory(channels.TypeTelegram, pendingStore),
+		groupHistory:    channels.MakeHistory(channels.TypeTelegram, pendingStore, base.TenantID()),
 		historyLimit:    historyLimit,
 		requireMention:  requireMention,
 	}, nil

@@ -86,7 +86,7 @@ func New(cfg config.FeishuConfig, msgBus *bus.MessageBus, pairingSvc store.Pairi
 		client:         client,
 		pairingService: pairingSvc,
 		groupAllowList: cfg.GroupAllowFrom,
-		groupHistory:   channels.MakeHistory(channels.TypeFeishu, pendingStore),
+		groupHistory:   channels.MakeHistory(channels.TypeFeishu, pendingStore, base.TenantID()),
 		historyLimit:   historyLimit,
 		stopCh:         make(chan struct{}),
 	}, nil
