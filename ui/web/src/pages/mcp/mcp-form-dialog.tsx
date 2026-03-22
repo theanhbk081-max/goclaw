@@ -52,6 +52,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
   const [toolPrefix, setToolPrefix] = useState("");
   const [timeout, setTimeout] = useState(60);
   const [enabled, setEnabled] = useState(true);
+  const [requireUserCreds, setRequireUserCreds] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; tool_count?: number; error?: string } | null>(null);
@@ -70,6 +71,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
       setToolPrefix((server?.tool_prefix ?? "").replace(/^mcp_/, ""));
       setTimeout(server?.timeout_sec ?? 60);
       setEnabled(server?.enabled ?? true);
+      setRequireUserCreds(server?.settings?.require_user_credentials ?? false);
       setError("");
       setTestResult(null);
     }
@@ -155,6 +157,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
         ...conn,
         tool_prefix: toolPrefix.trim() || undefined,
         timeout_sec: timeout,
+        settings: { require_user_credentials: requireUserCreds },
         enabled,
       });
       onOpenChange(false);
@@ -262,6 +265,15 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
             <Switch id="mcp-enabled" checked={enabled} onCheckedChange={setEnabled} />
             <Label htmlFor="mcp-enabled">{t("form.enabled")}</Label>
           </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Switch id="mcp-require-creds" checked={requireUserCreds} onCheckedChange={setRequireUserCreds} />
+              <Label htmlFor="mcp-require-creds">{t("form.requireUserCredentials")}</Label>
+            </div>
+            <p className="text-xs text-muted-foreground pl-9">{t("form.requireUserCredentialsHint")}</p>
+          </div>
+
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -166,6 +167,18 @@ func (m *Manager) LoadForAgent(ctx context.Context, agentID uuid.UUID, userID st
 		srv := info.Server
 		if !srv.Enabled {
 			continue
+		}
+
+		// Skip server if it requires per-user credentials and user has none
+		if requireUserCreds(srv.Settings) {
+			if userID == "" {
+				continue
+			}
+			uc, _ := m.store.GetUserCredentials(ctx, srv.ID, userID)
+			if uc == nil || (uc.APIKey == "" && len(uc.Headers) == 0 && len(uc.Env) == 0) {
+				slog.Debug("mcp.skip_no_user_credentials", "server", srv.Name, "user", userID)
+				continue
+			}
 		}
 
 		args := jsonBytesToStringSlice(srv.Args)
@@ -444,4 +457,16 @@ func (m *Manager) ServerStatus() []ServerStatus {
 		})
 	}
 	return statuses
+}
+
+// requireUserCreds checks if an MCP server's settings mandate per-user credentials.
+func requireUserCreds(settings json.RawMessage) bool {
+	if len(settings) == 0 {
+		return false
+	}
+	var s struct {
+		RequireUserCredentials bool `json:"require_user_credentials"`
+	}
+	_ = json.Unmarshal(settings, &s)
+	return s.RequireUserCredentials
 }

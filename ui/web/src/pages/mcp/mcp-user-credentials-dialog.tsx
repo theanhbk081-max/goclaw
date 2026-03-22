@@ -13,10 +13,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { KeyValueEditor } from "@/components/shared/key-value-editor";
 import { toast } from "@/stores/use-toast-store";
 import i18next from "i18next";
 import type { MCPServerData, MCPUserCredentialStatus, MCPUserCredentialInput } from "./hooks/use-mcp";
+
+/** Header keys whose values should be masked. */
+const SENSITIVE_HEADER_RE = /^(authorization|x-api-key|api-key|bearer|token|secret|password|credential)/i;
+const isSensitiveHeader = (key: string) => SENSITIVE_HEADER_RE.test(key.trim());
+
+/** Env var keys whose values should be masked. */
+const SENSITIVE_ENV_RE = /^.*(key|secret|token|password|credential).*$/i;
+const isSensitiveEnv = (key: string) => SENSITIVE_ENV_RE.test(key.trim());
 
 interface MCPUserCredentialsDialogProps {
   open: boolean;
@@ -25,20 +33,6 @@ interface MCPUserCredentialsDialogProps {
   onGetCredentials: (serverId: string) => Promise<MCPUserCredentialStatus>;
   onSetCredentials: (serverId: string, creds: MCPUserCredentialInput) => Promise<void>;
   onDeleteCredentials: (serverId: string) => Promise<void>;
-}
-
-function parseKVLines(text: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = trimmed.slice(eq + 1).trim();
-    if (key) result[key] = val;
-  }
-  return result;
 }
 
 export function MCPUserCredentialsDialog({
@@ -56,14 +50,14 @@ export function MCPUserCredentialsDialog({
   const [deleting, setDeleting] = useState(false);
 
   const [apiKey, setApiKey] = useState("");
-  const [headersText, setHeadersText] = useState("");
-  const [envText, setEnvText] = useState("");
+  const [headers, setHeaders] = useState<Record<string, string>>({});
+  const [env, setEnv] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     setApiKey("");
-    setHeadersText("");
-    setEnvText("");
+    setHeaders({});
+    setEnv({});
     setStatus(null);
     setLoadingStatus(true);
     onGetCredentials(server.id)
@@ -77,15 +71,13 @@ export function MCPUserCredentialsDialog({
     try {
       const creds: MCPUserCredentialInput = {};
       if (apiKey.trim()) creds.api_key = apiKey.trim();
-      const headers = parseKVLines(headersText);
       if (Object.keys(headers).length > 0) creds.headers = headers;
-      const env = parseKVLines(envText);
       if (Object.keys(env).length > 0) creds.env = env;
       await onSetCredentials(server.id, creds);
       toast.success(i18next.t("mcp:userCredentials.saved"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(i18next.t("mcp:userCredentials.saved"), err instanceof Error ? err.message : "");
+      toast.error(i18next.t("mcp:userCredentials.saveFailed"), err instanceof Error ? err.message : "");
     } finally {
       setSaving(false);
     }
@@ -98,7 +90,7 @@ export function MCPUserCredentialsDialog({
       toast.success(i18next.t("mcp:userCredentials.deleted"));
       onOpenChange(false);
     } catch (err) {
-      toast.error(i18next.t("mcp:userCredentials.deleted"), err instanceof Error ? err.message : "");
+      toast.error(i18next.t("mcp:userCredentials.deleteFailed"), err instanceof Error ? err.message : "");
     } finally {
       setDeleting(false);
     }
@@ -120,7 +112,8 @@ export function MCPUserCredentialsDialog({
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-1">
+            {/* Current status badges */}
             {status && (
               <div className="flex flex-wrap gap-2">
                 {!status.has_credentials ? (
@@ -141,6 +134,7 @@ export function MCPUserCredentialsDialog({
               </div>
             )}
 
+            {/* API Key */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="uc-api-key">{t("userCredentials.apiKey")}</Label>
               <Input
@@ -149,31 +143,33 @@ export function MCPUserCredentialsDialog({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={t("userCredentials.apiKeyPlaceholder")}
-                className="text-base md:text-sm"
+                className="text-base md:text-sm font-mono"
               />
             </div>
 
+            {/* Headers — KeyValueEditor with sensitive masking */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="uc-headers">{t("userCredentials.headers")}</Label>
-              <Textarea
-                id="uc-headers"
-                value={headersText}
-                onChange={(e) => setHeadersText(e.target.value)}
-                placeholder={t("userCredentials.headerPlaceholder")}
-                className="text-base md:text-sm font-mono text-xs resize-none"
-                rows={3}
+              <Label>{t("userCredentials.headers")}</Label>
+              <KeyValueEditor
+                value={headers}
+                onChange={setHeaders}
+                keyPlaceholder="Header"
+                valuePlaceholder="Value"
+                addLabel={t("userCredentials.addHeader")}
+                maskValue={isSensitiveHeader}
               />
             </div>
 
+            {/* Env vars — KeyValueEditor with sensitive masking */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="uc-env">{t("userCredentials.env")}</Label>
-              <Textarea
-                id="uc-env"
-                value={envText}
-                onChange={(e) => setEnvText(e.target.value)}
-                placeholder={t("userCredentials.headerPlaceholder")}
-                className="text-base md:text-sm font-mono text-xs resize-none"
-                rows={3}
+              <Label>{t("userCredentials.env")}</Label>
+              <KeyValueEditor
+                value={env}
+                onChange={setEnv}
+                keyPlaceholder="ENV_KEY"
+                valuePlaceholder="value"
+                addLabel={t("userCredentials.addEnv")}
+                maskValue={isSensitiveEnv}
               />
             </div>
           </div>

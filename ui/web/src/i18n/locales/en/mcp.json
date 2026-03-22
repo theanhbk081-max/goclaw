@@ -60,7 +60,9 @@
       "commandRequired": "Command is required for stdio transport",
       "urlRequired": "URL is required for SSE/HTTP transport",
       "connectionFailed": "Connection failed"
-    }
+    },
+    "requireUserCredentials": "Require User Credentials",
+    "requireUserCredentialsHint": "Each user must configure their own credentials. Server is disabled for users without personal credentials."
   },
   "grants": {
     "title": "Agent Grants - {{name}}",
@@ -115,6 +117,10 @@
     "hasApiKey": "API Key set",
     "hasHeaders": "Headers set",
     "hasEnv": "Env vars set",
-    "noCredentials": "No credentials set"
+    "noCredentials": "No credentials set",
+    "addHeader": "Add Header",
+    "addEnv": "Add Variable",
+    "saveFailed": "Failed to save credentials",
+    "deleteFailed": "Failed to delete credentials"
   }
 }
