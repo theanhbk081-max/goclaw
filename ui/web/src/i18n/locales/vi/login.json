@@ -1,4 +1,10 @@
 {
+  "selectTenant": "Chọn tổ chức",
+  "selectTenantDescription": "Chọn tổ chức để tiếp tục",
+  "allTenantsOption": "Tất cả tổ chức",
+  "allTenantsDescription": "Xem dữ liệu từ tất cả tổ chức",
+  "noAccess": "Không có quyền",
+  "noAccessDescription": "Bạn không có quyền truy cập tổ chức nào. Liên hệ quản trị viên.",
   "pairing": {
     "approved": "Truy cập đã được phê duyệt! Đang chuyển hướng...",
     "askAdmin": "Yêu cầu quản trị viên phê duyệt mã này:",

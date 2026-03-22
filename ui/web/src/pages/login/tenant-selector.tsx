@@ -1,0 +1,98 @@
+import { useLocation, useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/use-auth-store";
+import { LoginLayout } from "./login-layout";
+import { ROUTES } from "@/lib/constants";
+
+export function TenantSelectorPage() {
+  const { t } = useTranslation("login");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const availableTenants = useAuthStore((s) => s.availableTenants);
+  const isCrossTenant = useAuthStore((s) => s.isCrossTenant);
+  const logout = useAuthStore((s) => s.logout);
+
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
+
+  const handleSelect = (slug: string) => {
+    if (slug === "__all__") {
+      localStorage.removeItem("goclaw:tenant_scope");
+    } else {
+      localStorage.setItem("goclaw:tenant_scope", slug);
+    }
+    useAuthStore.getState().setTenantSelected(true);
+    // Reload to reconnect WS with the new tenant_scope
+    window.location.replace(from || ROUTES.OVERVIEW);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate(ROUTES.LOGIN, { replace: true });
+  };
+
+  // No access state: not cross-tenant and no tenants
+  if (!isCrossTenant && availableTenants.length === 0) {
+    return (
+      <LoginLayout subtitle={t("noAccess")}>
+        <div className="space-y-4 text-center">
+          <p className="text-sm text-muted-foreground">{t("noAccessDescription")}</p>
+          <button
+            onClick={handleLogout}
+            className="w-full rounded-md border border-input bg-background px-4 py-2 text-base md:text-sm font-medium hover:bg-muted transition-colors"
+          >
+            {t("token.connect", { defaultValue: "Sign out" })}
+          </button>
+        </div>
+      </LoginLayout>
+    );
+  }
+
+  return (
+    <LoginLayout subtitle={t("selectTenantDescription")}>
+      <div className="space-y-3">
+        <h2 className="text-center text-base font-medium">{t("selectTenant")}</h2>
+
+        {/* All Tenants option for cross-tenant admins */}
+        {isCrossTenant && (
+          <button
+            onClick={() => handleSelect("__all__")}
+            className="w-full rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-4 text-left transition-colors hover:bg-amber-100 dark:hover:bg-amber-950/50"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="font-semibold text-amber-900 dark:text-amber-100">
+                  {t("allTenantsOption")}
+                </p>
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                  {t("allTenantsDescription")}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-amber-200 dark:bg-amber-800 px-2 py-0.5 text-xs font-medium text-amber-900 dark:text-amber-100">
+                admin
+              </span>
+            </div>
+          </button>
+        )}
+
+        {/* Individual tenant cards */}
+        {availableTenants.map((tenant) => (
+          <button
+            key={tenant.id}
+            onClick={() => handleSelect(tenant.slug)}
+            className="w-full rounded-lg border border-input bg-card p-4 text-left transition-colors hover:bg-muted"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{tenant.name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{tenant.slug}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground capitalize">
+                {tenant.role}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </LoginLayout>
+  );
+}

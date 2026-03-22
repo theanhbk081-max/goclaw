@@ -16,6 +16,7 @@ interface AuthState {
   tenantSlug: string;
   isCrossTenant: boolean;
   availableTenants: TenantMembership[];
+  tenantSelected: boolean; // true after user picks a tenant (or auto-selected)
 
   setCredentials: (token: string, userId: string) => void;
   setPairing: (senderID: string, userId: string) => void;
@@ -23,6 +24,7 @@ interface AuthState {
   setRole: (role: UserRole) => void;
   setTenant: (id: string, name: string, slug: string, isCrossTenant: boolean) => void;
   setAvailableTenants: (tenants: TenantMembership[]) => void;
+  setTenantSelected: (selected: boolean) => void;
   logout: () => void;
 }
 
@@ -38,6 +40,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   tenantSlug: "",
   isCrossTenant: false,
   availableTenants: [],
+  tenantSelected: !!localStorage.getItem("goclaw:tenant_scope"),
 
   setCredentials: (token, userId) => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.TOKEN, token);
@@ -67,6 +70,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ availableTenants: tenants });
   },
 
+  setTenantSelected: (selected) => {
+    set({ tenantSelected: selected });
+  },
+
   logout: () => {
     localStorage.removeItem(LOCAL_STORAGE_KEYS.TOKEN);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.USER_ID);
@@ -74,6 +81,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       token: "", userId: "", senderID: "", connected: false, role: "", serverInfo: null,
       tenantId: "", tenantName: "", tenantSlug: "", isCrossTenant: false, availableTenants: [],
+      tenantSelected: false,
     });
   },
 }));

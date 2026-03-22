@@ -39,6 +39,7 @@ export const ROUTES = {
   TENANTS: "/admin/tenants",
   TENANT_DETAIL: "/admin/tenants/:id",
   SETUP: "/setup",
+  SELECT_TENANT: "/select-tenant",
 } as const;
 
 export const LOCAL_STORAGE_KEYS = {

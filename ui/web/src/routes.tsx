@@ -102,6 +102,9 @@ const TenantsAdminPage = lazyWithRetry(() =>
 const TenantDetailPage = lazyWithRetry(() =>
   import("@/pages/tenants-admin/tenant-detail-page").then((m) => ({ default: m.TenantDetailPage })),
 );
+const TenantSelectorPage = lazyWithRetry(() =>
+  import("@/pages/login/tenant-selector").then((m) => ({ default: m.TenantSelectorPage })),
+);
 
 function PageLoader() {
   return (
@@ -117,6 +120,9 @@ export function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+
+        {/* Tenant selector — accessible when authenticated but tenant not yet selected */}
+        <Route path={ROUTES.SELECT_TENANT} element={<TenantSelectorPage />} />
 
         {/* Setup wizard — standalone layout, requires auth but no sidebar */}
         <Route

@@ -37,7 +37,27 @@ export function WsProvider({ children }: { children: React.ReactNode }) {
           // Fetch tenant memberships asynchronously
           client.call<{ tenants: TenantMembership[] }>(Methods.TENANTS_MINE)
             .then((res) => {
-              store.setAvailableTenants(res?.tenants ?? []);
+              const tenants = res?.tenants ?? [];
+              store.setAvailableTenants(tenants);
+
+              // Auto-select tenant if applicable
+              const savedScope = localStorage.getItem("goclaw:tenant_scope");
+              if (savedScope && tenants.some((t) => t.slug === savedScope)) {
+                // Already scoped via localStorage — auto-select
+                store.setTenantSelected(true);
+              } else if (!client.crossTenant && tenants.length === 1) {
+                // Non-admin with single tenant — auto-select
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                localStorage.setItem("goclaw:tenant_scope", tenants[0]!.slug);
+                store.setTenantSelected(true);
+              } else if (!client.crossTenant && tenants.length === 0) {
+                // No tenants — leave tenantSelected=false (blocked)
+              } else if (client.crossTenant && !savedScope) {
+                // Cross-tenant admin without scope — auto-select "All Tenants"
+                store.setTenantSelected(true);
+              } else {
+                store.setTenantSelected(true);
+              }
             })
             .catch(() => {
               // Non-critical: silently ignore if not supported
@@ -46,6 +66,7 @@ export function WsProvider({ children }: { children: React.ReactNode }) {
         if (state === "disconnected") {
           store.setTenant("", "", "", false);
           store.setAvailableTenants([]);
+          store.setTenantSelected(false);
         }
       },
     );
