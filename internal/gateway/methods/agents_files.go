@@ -3,6 +3,7 @@ package methods
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -241,6 +242,13 @@ func (m *AgentsMethods) handleFilesSet(ctx context.Context, client *gateway.Clie
 		if err != nil {
 			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrNotFound, i18n.T(locale, i18n.MsgAgentNotFound, params.AgentID)))
 			return
+		}
+
+		// Snapshot current state before file change (non-fatal)
+		if userID := client.UserID(); userID != "" {
+			if err := m.agentStore.CreateVersion(ctx, ag.ID, userID, params.Name+" updated"); err != nil {
+				slog.Warn("agents.files.set: failed to create version snapshot", "agent", params.AgentID, "file", params.Name, "error", err)
+			}
 		}
 
 		if err := m.agentStore.SetAgentContextFile(ctx, ag.ID, params.Name, params.Content); err != nil {

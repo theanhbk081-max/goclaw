@@ -90,7 +90,8 @@
       "links": "Links",
       "skills": "Skills",
       "instances": "Instances",
-      "permissions": "Permissions"
+      "permissions": "Permissions",
+      "versions": "History"
     },
     "summonFailed": "Summon Failed",
     "evolving": "Evolving",
@@ -498,6 +499,33 @@
       "group_all": "All Groups",
       "global": "Global (all contexts)"
     }
+  },
+  "versions": {
+    "loading": "Loading version history...",
+    "noVersions": "No version history",
+    "noVersionsDesc": "Versions are created automatically when you update the agent config.",
+    "noSummary": "Config updated",
+    "view": "View details",
+    "rollback": "Rollback",
+    "detailTitle": "Version {{version}}",
+    "rollbackTitle": "Rollback Agent Config",
+    "rollbackDesc": "This will restore the agent config to version {{version}}. A snapshot of the current config will be saved before rollback.",
+    "cancel": "Cancel",
+    "rollbackConfirm": "Rollback",
+    "rollingBack": "Rolling back...",
+    "rollbackSuccess": "Rolled back to version {{version}}",
+    "rollbackFailed": "Failed to rollback",
+    "fieldModel": "Model",
+    "fieldName": "Name",
+    "fieldWorkspace": "Workspace",
+    "fieldChanges": "Changes",
+    "fieldChangedBy": "Changed by",
+    "fieldDate": "Date",
+    "fieldToolsConfig": "Tools Config",
+    "fieldSandboxConfig": "Sandbox Config",
+    "fieldMemoryConfig": "Memory Config",
+    "fieldOtherConfig": "Other Config",
+    "fieldContextFiles": "Context Files"
   },
   "toast": {
     "created": "Agent created",

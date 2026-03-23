@@ -102,6 +102,15 @@ func (s *seedStubStore) UpdateUserProfileMetadata(_ context.Context, _ uuid.UUID
 func (s *seedStubStore) EnsureUserProfile(_ context.Context, _ uuid.UUID, _ string) error {
 	return nil
 }
+func (s *seedStubStore) CreateVersion(_ context.Context, _ uuid.UUID, _, _ string) error {
+	return nil
+}
+func (s *seedStubStore) ListVersions(_ context.Context, _ uuid.UUID, _, _ int) ([]store.AgentVersionData, int, error) {
+	return nil, 0, nil
+}
+func (s *seedStubStore) GetVersion(_ context.Context, _ uuid.UUID, _ int) (*store.AgentVersionData, error) {
+	return nil, nil
+}
 
 // ---- Tests ----
 

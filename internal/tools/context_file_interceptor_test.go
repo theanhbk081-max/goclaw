@@ -84,6 +84,15 @@ func (s *stubAgentStore) UpdateUserProfileMetadata(_ context.Context, _ uuid.UUI
 func (s *stubAgentStore) EnsureUserProfile(_ context.Context, _ uuid.UUID, _ string) error {
 	return nil
 }
+func (s *stubAgentStore) CreateVersion(_ context.Context, _ uuid.UUID, _, _ string) error {
+	return nil
+}
+func (s *stubAgentStore) ListVersions(_ context.Context, _ uuid.UUID, _, _ int) ([]store.AgentVersionData, int, error) {
+	return nil, 0, nil
+}
+func (s *stubAgentStore) GetVersion(_ context.Context, _ uuid.UUID, _ int) (*store.AgentVersionData, error) {
+	return nil, nil
+}
 
 // ---- Tests ----
 

@@ -12,6 +12,7 @@ export const queryKeys = {
     files: (agentKey: string) => ["agents", agentKey, "files"] as const,
     links: (agentId: string) => ["agents", agentId, "links"] as const,
     instances: (agentId: string) => ["agents", agentId, "instances"] as const,
+    versions: (agentId: string) => ["agents", agentId, "versions"] as const,
   },
   sessions: {
     all: ["sessions"] as const,

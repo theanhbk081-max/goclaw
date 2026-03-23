@@ -90,7 +90,8 @@
       "links": "Liên kết",
       "skills": "Skill",
       "instances": "Phiên bản người dùng",
-      "permissions": "Phân quyền"
+      "permissions": "Phân quyền",
+      "versions": "Lịch sử"
     },
     "summonFailed": "Triệu hồi thất bại",
     "evolving": "Đang tiến hóa",
@@ -498,6 +499,33 @@
       "group_all": "Tất cả nhóm",
       "global": "Toàn cục"
     }
+  },
+  "versions": {
+    "loading": "Đang tải lịch sử...",
+    "noVersions": "Chưa có lịch sử",
+    "noVersionsDesc": "Phiên bản được tạo tự động khi bạn cập nhật cấu hình agent.",
+    "noSummary": "Cấu hình đã cập nhật",
+    "view": "Xem chi tiết",
+    "rollback": "Khôi phục",
+    "detailTitle": "Phiên bản {{version}}",
+    "rollbackTitle": "Khôi phục cấu hình Agent",
+    "rollbackDesc": "Cấu hình agent sẽ được khôi phục về phiên bản {{version}}. Cấu hình hiện tại sẽ được lưu trước khi khôi phục.",
+    "cancel": "Hủy",
+    "rollbackConfirm": "Khôi phục",
+    "rollingBack": "Đang khôi phục...",
+    "rollbackSuccess": "Đã khôi phục về phiên bản {{version}}",
+    "rollbackFailed": "Khôi phục thất bại",
+    "fieldModel": "Model",
+    "fieldName": "Tên",
+    "fieldWorkspace": "Workspace",
+    "fieldChanges": "Thay đổi",
+    "fieldChangedBy": "Người thay đổi",
+    "fieldDate": "Ngày",
+    "fieldToolsConfig": "Cấu hình Tools",
+    "fieldSandboxConfig": "Cấu hình Sandbox",
+    "fieldMemoryConfig": "Cấu hình Memory",
+    "fieldOtherConfig": "Cấu hình khác",
+    "fieldContextFiles": "Context Files"
   },
   "toast": {
     "created": "Đã tạo agent",

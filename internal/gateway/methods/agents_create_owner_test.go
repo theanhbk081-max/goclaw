@@ -95,6 +95,15 @@ func (s *createCaptureStore) UpdateUserProfileMetadata(_ context.Context, _ uuid
 func (s *createCaptureStore) EnsureUserProfile(_ context.Context, _ uuid.UUID, _ string) error {
 	return nil
 }
+func (s *createCaptureStore) CreateVersion(_ context.Context, _ uuid.UUID, _, _ string) error {
+	return nil
+}
+func (s *createCaptureStore) ListVersions(_ context.Context, _ uuid.UUID, _, _ int) ([]store.AgentVersionData, int, error) {
+	return nil, 0, nil
+}
+func (s *createCaptureStore) GetVersion(_ context.Context, _ uuid.UUID, _ int) (*store.AgentVersionData, error) {
+	return nil, nil
+}
 
 // ---- helpers ----
 

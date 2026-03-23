@@ -48,6 +48,9 @@ func (m *AgentsMethods) Register(router *gateway.MethodRouter) {
 	router.Register(protocol.MethodAgentsFileGet, m.handleFilesGet)
 	router.Register(protocol.MethodAgentsFileSet, m.handleFilesSet)
 	router.Register(protocol.MethodAgentIdentityGet, m.handleIdentityGet)
+	router.Register(protocol.MethodAgentsVersionsList, m.handleVersionsList)
+	router.Register(protocol.MethodAgentsVersionsGet, m.handleVersionsGet)
+	router.Register(protocol.MethodAgentsVersionsRollback, m.handleVersionsRollback)
 }
 
 type agentParams struct {

@@ -120,6 +120,11 @@ export const Methods = {
 
   SEND: "send",
 
+  // Agent versioning
+  AGENTS_VERSIONS_LIST: "agents.versions.list",
+  AGENTS_VERSIONS_GET: "agents.versions.get",
+  AGENTS_VERSIONS_ROLLBACK: "agents.versions.rollback",
+
   // Agent links (delegation)
   AGENTS_LINKS_LIST: "agents.links.list",
   AGENTS_LINKS_CREATE: "agents.links.create",

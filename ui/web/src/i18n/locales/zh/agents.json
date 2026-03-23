@@ -90,7 +90,8 @@
       "links": "链接",
       "skills": "Skill",
       "instances": "用户实例",
-      "permissions": "权限"
+      "permissions": "权限",
+      "versions": "历史"
     },
     "summonFailed": "召唤失败",
     "evolving": "进化中",
@@ -498,6 +499,33 @@
       "group_all": "所有群组",
       "global": "全局"
     }
+  },
+  "versions": {
+    "loading": "加载版本历史...",
+    "noVersions": "暂无版本历史",
+    "noVersionsDesc": "更新 Agent 配置时会自动创建版本。",
+    "noSummary": "配置已更新",
+    "view": "查看详情",
+    "rollback": "回滚",
+    "detailTitle": "版本 {{version}}",
+    "rollbackTitle": "回滚 Agent 配置",
+    "rollbackDesc": "将 Agent 配置恢复到版本 {{version}}。回滚前会保存当前配置的快照。",
+    "cancel": "取消",
+    "rollbackConfirm": "回滚",
+    "rollingBack": "正在回滚...",
+    "rollbackSuccess": "已回滚到版本 {{version}}",
+    "rollbackFailed": "回滚失败",
+    "fieldModel": "模型",
+    "fieldName": "名称",
+    "fieldWorkspace": "工作区",
+    "fieldChanges": "变更",
+    "fieldChangedBy": "修改者",
+    "fieldDate": "日期",
+    "fieldToolsConfig": "工具配置",
+    "fieldSandboxConfig": "沙箱配置",
+    "fieldMemoryConfig": "记忆配置",
+    "fieldOtherConfig": "其他配置",
+    "fieldContextFiles": "上下文文件"
   },
   "toast": {
     "created": "代理已创建",

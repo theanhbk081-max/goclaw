@@ -68,6 +68,8 @@ export function useAgentDetail(agentId: string | undefined) {
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agentId ?? "") });
     queryClient.invalidateQueries({ queryKey: queryKeys.agents.all });
+    // Also refresh version history so the History tab shows the new snapshot
+    queryClient.invalidateQueries({ queryKey: queryKeys.agents.versions(agentId ?? "") });
   }, [queryClient, agentId]);
 
   const updateAgent = useCallback(

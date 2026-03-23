@@ -88,6 +88,15 @@ func (m *AgentsMethods) handleUpdate(ctx context.Context, client *gateway.Client
 		}
 
 		if len(updates) > 0 {
+			// Snapshot current state before applying changes (non-fatal)
+			if userID := client.UserID(); userID != "" {
+				if summary := buildChangeSummary(ag, updates); summary != "" {
+					if err := m.agentStore.CreateVersion(ctx, ag.ID, userID, summary); err != nil {
+						slog.Warn("agents.update: failed to create version snapshot", "agent", params.AgentID, "error", err)
+					}
+				}
+			}
+
 			if err := m.agentStore.Update(ctx, ag.ID, updates); err != nil {
 				client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInternal, i18n.T(locale, i18n.MsgFailedToUpdate, "agent", fmt.Sprintf("%v", err))))
 				return

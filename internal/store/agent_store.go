@@ -341,12 +341,43 @@ type AgentStore interface {
 	GetUserOverride(ctx context.Context, agentID uuid.UUID, userID string) (*UserAgentOverrideData, error)
 	SetUserOverride(ctx context.Context, override *UserAgentOverrideData) error
 
+	// Versioning
+	CreateVersion(ctx context.Context, agentID uuid.UUID, changedBy, changeSummary string) error
+	ListVersions(ctx context.Context, agentID uuid.UUID, limit, offset int) ([]AgentVersionData, int, error)
+	GetVersion(ctx context.Context, agentID uuid.UUID, version int) (*AgentVersionData, error)
+
 	// User-agent profiles + instances
 	GetOrCreateUserProfile(ctx context.Context, agentID uuid.UUID, userID, workspace, channel string) (isNew bool, effectiveWorkspace string, err error)
 	EnsureUserProfile(ctx context.Context, agentID uuid.UUID, userID string) error
 	ListUserInstances(ctx context.Context, agentID uuid.UUID) ([]UserInstanceData, error)
 	UpdateUserProfileMetadata(ctx context.Context, agentID uuid.UUID, userID string, metadata map[string]string) error
 
+}
+
+// AgentVersionData represents a snapshot of agent config at a point in time.
+type AgentVersionData struct {
+	ID                  uuid.UUID       `json:"id"`
+	AgentID             uuid.UUID       `json:"agent_id"`
+	Version             int             `json:"version"`
+	DisplayName         string          `json:"display_name,omitempty"`
+	Frontmatter         string          `json:"frontmatter,omitempty"`
+	Provider            string          `json:"provider"`
+	Model               string          `json:"model"`
+	ContextWindow       int             `json:"context_window"`
+	MaxToolIterations   int             `json:"max_tool_iterations"`
+	Workspace           string          `json:"workspace"`
+	RestrictToWorkspace bool            `json:"restrict_to_workspace"`
+	ToolsConfig         json.RawMessage `json:"tools_config,omitempty"`
+	SandboxConfig       json.RawMessage `json:"sandbox_config,omitempty"`
+	SubagentsConfig     json.RawMessage `json:"subagents_config,omitempty"`
+	MemoryConfig        json.RawMessage `json:"memory_config,omitempty"`
+	CompactionConfig    json.RawMessage `json:"compaction_config,omitempty"`
+	ContextPruning      json.RawMessage `json:"context_pruning,omitempty"`
+	OtherConfig         json.RawMessage `json:"other_config,omitempty"`
+	ContextFiles        json.RawMessage `json:"context_files,omitempty"`
+	ChangedBy           string          `json:"changed_by"`
+	ChangeSummary       string          `json:"change_summary,omitempty"`
+	CreatedAt           string          `json:"created_at"`
 }
 
 // UserInstanceData represents a user instance for a predefined agent.

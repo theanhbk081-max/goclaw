@@ -111,6 +111,13 @@ const (
 	MethodChannelInstancesDelete = "channels.instances.delete"
 )
 
+// Agent versioning
+const (
+	MethodAgentsVersionsList     = "agents.versions.list"
+	MethodAgentsVersionsGet      = "agents.versions.get"
+	MethodAgentsVersionsRollback = "agents.versions.rollback"
+)
+
 // Agent links (inter-agent delegation)
 const (
 	MethodAgentsLinksList   = "agents.links.list"

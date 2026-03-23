@@ -255,6 +255,17 @@ func (h *AgentsHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	allowed := filterAllowedKeys(updates, agentAllowedFields)
 	allowed["restrict_to_workspace"] = true
 
+	// Snapshot current state before applying changes (non-fatal).
+	// Only create version if there are actual value changes (not just re-sending same data).
+	if changedBy := userID; changedBy != "" {
+		summary := buildHTTPChangeSummary(ag, allowed)
+		if summary != "" {
+			if err := h.agents.CreateVersion(r.Context(), id, changedBy, summary); err != nil {
+				slog.Warn("http: failed to create version snapshot", "agent", ag.AgentKey, "error", err)
+			}
+		}
+	}
+
 	if err := h.agents.Update(r.Context(), id, allowed); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -312,4 +323,108 @@ func (h *AgentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 	emitAudit(h.msgBus, r, "agent.deleted", "agent", id.String())
 	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
+// buildHTTPChangeSummary compares updates against the current agent state
+// and only includes fields that actually changed.
+func buildHTTPChangeSummary(ag *store.AgentData, updates map[string]any) string {
+	// Build a map of current values for comparison
+	current := map[string]any{
+		"display_name":        ag.DisplayName,
+		"frontmatter":         ag.Frontmatter,
+		"provider":            ag.Provider,
+		"model":               ag.Model,
+		"context_window":      float64(ag.ContextWindow),      // JSON numbers decode as float64
+		"max_tool_iterations": float64(ag.MaxToolIterations),
+		"workspace":           ag.Workspace,
+		"restrict_to_workspace": ag.RestrictToWorkspace,
+		"status":              ag.Status,
+		"is_default":          ag.IsDefault,
+	}
+
+	var parts []string
+	for key, newVal := range updates {
+		if key == "restrict_to_workspace" {
+			continue
+		}
+		// Compare: skip if value unchanged
+		if oldVal, ok := current[key]; ok {
+			if fmt.Sprintf("%v", oldVal) == fmt.Sprintf("%v", newVal) {
+				continue
+			}
+		}
+		// JSONB fields: compare JSON content
+		if isJSONBField(key) {
+			oldJSON := agentJSONBField(ag, key)
+			if newBytes, ok := newVal.([]byte); ok && jsonEqual(oldJSON, newBytes) {
+				continue
+			}
+		}
+
+		switch key {
+		case "model":
+			if s, ok := newVal.(string); ok {
+				parts = append(parts, fmt.Sprintf("model: %s → %s", ag.Model, s))
+			}
+		case "provider":
+			if s, ok := newVal.(string); ok {
+				parts = append(parts, fmt.Sprintf("provider: %s → %s", ag.Provider, s))
+			}
+		case "display_name":
+			if s, ok := newVal.(string); ok {
+				parts = append(parts, fmt.Sprintf("name: %s → %s", ag.DisplayName, s))
+			}
+		default:
+			parts = append(parts, strings.ReplaceAll(key, "_", " ")+" updated")
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, ", ")
+}
+
+func isJSONBField(key string) bool {
+	switch key {
+	case "tools_config", "sandbox_config", "subagents_config",
+		"memory_config", "compaction_config", "context_pruning", "other_config":
+		return true
+	}
+	return false
+}
+
+func agentJSONBField(ag *store.AgentData, key string) []byte {
+	switch key {
+	case "tools_config":
+		return ag.ToolsConfig
+	case "sandbox_config":
+		return ag.SandboxConfig
+	case "subagents_config":
+		return ag.SubagentsConfig
+	case "memory_config":
+		return ag.MemoryConfig
+	case "compaction_config":
+		return ag.CompactionConfig
+	case "context_pruning":
+		return ag.ContextPruning
+	case "other_config":
+		return ag.OtherConfig
+	}
+	return nil
+}
+
+func jsonEqual(a, b []byte) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	var va, vb any
+	if json.Unmarshal(a, &va) != nil || json.Unmarshal(b, &vb) != nil {
+		return false
+	}
+	ra, _ := json.Marshal(va)
+	rb, _ := json.Marshal(vb)
+	return string(ra) == string(rb)
 }
