@@ -724,6 +724,7 @@ func (l *Loop) runLoop(ctx context.Context, req RunRequest) (*RunResult, error) 
 				providers.OptChannel:     req.Channel,
 				providers.OptChatID:      req.ChatID,
 				providers.OptPeerKind:    req.PeerKind,
+				providers.OptWorkspace:   tools.ToolWorkspaceFromCtx(ctx),
 			},
 		}
 		if l.thinkingLevel != "" && l.thinkingLevel != "off" {
