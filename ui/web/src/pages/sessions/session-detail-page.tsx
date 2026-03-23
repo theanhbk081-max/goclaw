@@ -73,7 +73,10 @@ export function SessionDetailPage({
             allMsgs.map((m, i) => {
               const chatMsg: ChatMessage = {
                 ...m,
-                timestamp: Date.now() - (allMsgs.length - i) * 1000,
+                // Use server-provided created_at; fall back to synthetic spacing for older messages.
+                timestamp: m.created_at
+                  ? new Date(m.created_at).getTime()
+                  : Date.now() - (allMsgs.length - i) * 1000,
               };
               // Reconstruct toolDetails for assistant messages with tool_calls
               if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {

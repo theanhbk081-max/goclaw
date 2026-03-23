@@ -90,7 +90,10 @@ export function useChatMessages(sessionKey: string, agentId: string) {
       const msgs: ChatMessage[] = allMsgs.map((m: Message, i: number) => {
         const chatMsg: ChatMessage = {
           ...m,
-          timestamp: Date.now() - (allMsgs.length - i) * 1000,
+          // Use server-provided created_at; fall back to synthetic spacing for older messages.
+          timestamp: m.created_at
+            ? new Date(m.created_at).getTime()
+            : Date.now() - (allMsgs.length - i) * 1000,
         };
         // Convert persisted media_refs to mediaItems for gallery display
         if (m.role === "assistant" && m.media_refs && m.media_refs.length > 0) {
