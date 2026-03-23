@@ -23,6 +23,15 @@ export class WsClient {
   private intentionalClose = false;
   private connectGeneration = 0;
 
+  /** Server-assigned role from connect response. */
+  role: "admin" | "operator" | "viewer" | "" = "";
+
+  /** Tenant fields from connect response. */
+  tenantId = "";
+  tenantName = "";
+  tenantSlug = "";
+  crossTenant = false;
+
   private readonly maxReconnectDelay = 30_000;
   private readonly baseReconnectDelay = 1_000;
   private readonly defaultTimeout = 30_000;
@@ -193,11 +202,17 @@ export class WsClient {
         status?: string;
         pairing_code?: string;
         sender_id?: string;
+        tenant_id?: string;
+        tenant_name?: string;
+        tenant_slug?: string;
+        cross_tenant?: boolean;
       }>("connect", {
         token: this.getToken(),
         user_id: this.getUserId(),
         sender_id: this.getSenderID(),
         locale: localStorage.getItem("goclaw:language") || "en",
+        tenant_hint: localStorage.getItem("goclaw:tenant_hint") || "",
+        tenant_id: localStorage.getItem("goclaw:tenant_id") || "",
         protocolVersion: PROTOCOL_VERSION,
       });
       if (this.connectGeneration !== generation) return;
@@ -218,9 +233,21 @@ export class WsClient {
       }
 
       this.authenticated = true;
+      this.role = (res?.role as "admin" | "operator" | "viewer") ?? "";
+      this.tenantId = res?.tenant_id ?? "";
+      this.tenantName = res?.tenant_name ?? "";
+      this.tenantSlug = res?.tenant_slug ?? "";
+      this.crossTenant = res?.cross_tenant ?? false;
       this.onStateChange("connected");
-    } catch {
+    } catch (e) {
       if (this.connectGeneration === generation) {
+        // Tenant access revoked → force logout instead of reconnect
+        if (e instanceof ApiError && e.code === "TENANT_ACCESS_REVOKED") {
+          this.intentionalClose = true;
+          this.ws?.close();
+          this.onAuthFailure?.();
+          return;
+        }
         this.ws?.close();
       }
     }
@@ -252,7 +279,7 @@ export class WsClient {
       pending.resolve(frame.payload);
     } else {
       const err = frame.error as ErrorShape;
-      if (err.code === "UNAUTHORIZED") {
+      if (err.code === "UNAUTHORIZED" || err.code === "TENANT_ACCESS_REVOKED") {
         this.onAuthFailure?.();
       }
       pending.reject(

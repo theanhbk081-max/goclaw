@@ -80,6 +80,13 @@ func (m *TeamToolManager) dispatchTaskToAgent(ctx context.Context, task *store.T
 		}
 	}
 
+	// Hint: guide member on available team_tasks actions.
+	content += "\n\n[Instructions]\n" +
+		"- Use team_tasks(action=\"progress\", percent=N, text=\"...\") to report progress\n" +
+		"- Use team_tasks(action=\"comment\", text=\"...\") to share findings or ask questions — comments are included in the task report sent to the leader\n" +
+		"- When done: team_tasks(action=\"complete\", result=\"summary of your work\")\n" +
+		"- Write output files to team workspace so lead can review"
+
 	// Use task's stored channel/chat as primary source for routing.
 	// Falls back to ctx values for initial dispatch (task just created, fields match ctx).
 	originChannel := task.Channel
@@ -166,6 +173,7 @@ func (m *TeamToolManager) dispatchTaskToAgent(ctx context.Context, task *store.T
 		ChatID:   teamID.String(),
 		Content:  content,
 		UserID:   originUserID,
+		TenantID: store.TenantIDFromContext(ctx),
 		AgentID:  ag.AgentKey,
 		Metadata: meta,
 	}) {
@@ -304,7 +312,7 @@ func (m *TeamToolManager) DispatchUnblockedTasks(ctx context.Context, teamID uui
 			continue
 		}
 		dispatched[ownerID] = true
-		m.broadcastTeamEvent(protocol.EventTeamTaskDispatched, protocol.TeamTaskEventPayload{
+		m.broadcastTeamEvent(ctx, protocol.EventTeamTaskDispatched, protocol.TeamTaskEventPayload{
 			TeamID:        teamID.String(),
 			TaskID:        task.ID.String(),
 			TaskNumber:    task.TaskNumber,
