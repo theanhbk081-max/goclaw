@@ -53,25 +53,24 @@ func (m *QRMethods) handleQRStart(ctx context.Context, client *gateway.Client, r
 		return
 	}
 
-	// Cancel any previous QR session for this instance so the user can retry.
-	if prev, loaded := m.activeSessions.Load(params.InstanceID); loaded {
+	qrCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+
+	// Atomically swap cancel func; cancel any previous QR session so the user can retry.
+	if prev, loaded := m.activeSessions.Swap(params.InstanceID, cancel); loaded {
 		if cancelFn, ok := prev.(context.CancelFunc); ok {
 			cancelFn()
 		}
-		m.activeSessions.Delete(params.InstanceID)
 	}
-
-	qrCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	m.activeSessions.Store(params.InstanceID, cancel)
 
 	// ACK immediately — QR arrives via event.
 	client.SendResponse(goclawprotocol.NewOKResponse(req.ID, map[string]any{"status": "started"}))
 
-	go m.runQRFlow(qrCtx, client, params.InstanceID, instID)
+	go m.runQRFlow(qrCtx, cancel, client, params.InstanceID, instID)
 }
 
-func (m *QRMethods) runQRFlow(ctx context.Context, client *gateway.Client, instanceIDStr string, instanceID uuid.UUID) {
-	defer m.activeSessions.Delete(instanceIDStr)
+func (m *QRMethods) runQRFlow(ctx context.Context, cancel context.CancelFunc, client *gateway.Client, instanceIDStr string, instanceID uuid.UUID) {
+	defer cancel()
+	defer m.activeSessions.CompareAndDelete(instanceIDStr, cancel)
 
 	sess := protocol.NewSession()
 
