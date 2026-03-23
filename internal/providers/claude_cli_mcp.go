@@ -260,7 +260,14 @@ func SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspac
 }
 
 // VerifyBridgeContext checks the HMAC signature against the expected bridge context.
+// Falls back to old format (without workspace) for backward compatibility with
+// sessions whose MCP config was written before the workspace field was added.
 func VerifyBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace, sig string) bool {
 	expected := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, workspace)
-	return hmac.Equal([]byte(expected), []byte(sig))
+	if hmac.Equal([]byte(expected), []byte(sig)) {
+		return true
+	}
+	// Fallback: verify old format (without workspace) for backward compat.
+	old := SignBridgeContext(key, agentID, userID, channel, chatID, peerKind, "")
+	return hmac.Equal([]byte(old), []byte(sig))
 }

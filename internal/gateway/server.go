@@ -383,7 +383,8 @@ func bridgeContextMiddleware(gatewayToken string, next http.Handler) http.Handle
 			ctx = tools.WithToolPeerKind(ctx, peerKind)
 		}
 		// Inject workspace so bridge tools (read_image, read_file, etc.) can resolve paths.
-		if workspace != "" {
+		// Only when agent context is present (HMAC-protected) to prevent unauthenticated path injection.
+		if workspace != "" && (agentIDStr != "" || userID != "") {
 			ctx = tools.WithToolWorkspace(ctx, workspace)
 		}
 
