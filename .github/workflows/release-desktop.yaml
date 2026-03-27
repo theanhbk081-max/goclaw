@@ -11,16 +11,14 @@ env:
   GITHUB_REPO: ${{ github.repository }}
 
 jobs:
-  # ── macOS builds (native runners required for Wails/WebKit) ──
+  # ── macOS builds (arm64 native + amd64 cross-compile on same runner) ──
   build-macos:
     strategy:
       matrix:
         include:
-          - runner: macos-14    # Apple Silicon (arm64)
-            arch: arm64
-          - runner: macos-13    # Intel (amd64)
-            arch: amd64
-    runs-on: ${{ matrix.runner }}
+          - arch: arm64
+          - arch: amd64
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +46,8 @@ jobs:
 
       - name: Build desktop app
         working-directory: ui/desktop
+        env:
+          GOARCH: ${{ matrix.arch }}
         run: |
           wails build -tags sqliteonly \
             -ldflags "-s -w -X github.com/nextlevelbuilder/goclaw/cmd.Version=${{ steps.version.outputs.version }}"
