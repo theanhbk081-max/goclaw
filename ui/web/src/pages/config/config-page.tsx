@@ -17,6 +17,7 @@ import { QuotaSection } from "./sections/quota-section";
 import { ToolsProfileSection } from "./sections/tools-profile-section";
 import { ToolsExecSection } from "./sections/tools-exec-section";
 import { ToolsWebSection } from "./sections/tools-web-section";
+import { BrowserRuntimeSection } from "./sections/browser-runtime-section";
 import { ShellSecuritySection } from "./sections/shell-security-section";
 import { TtsSection } from "./sections/tts-section";
 import { CronSection } from "./sections/cron-section";
@@ -145,6 +146,11 @@ export function ConfigPage() {
             saving={saving}
           />
           <ToolsWebSection
+            data={config.tools as any}
+            onSave={(v) => patch({ tools: v })}
+            saving={saving}
+          />
+          <BrowserRuntimeSection
             data={config.tools as any}
             onSave={(v) => patch({ tools: v })}
             saving={saving}

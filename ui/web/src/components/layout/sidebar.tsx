@@ -26,6 +26,7 @@ import {
   Contact,
   KeyRound,
   Building2,
+  Monitor,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SidebarGroup } from "./sidebar-group";
@@ -114,6 +115,7 @@ export function Sidebar({ collapsed, onNavItemClick }: SidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup label={t("groups.monitoring")} collapsed={collapsed}>
+          <SidebarItem to={ROUTES.BROWSER} icon={Monitor} label={t("nav.browser")} collapsed={collapsed} />
           <SidebarItem to={ROUTES.TRACES} icon={Activity} label={t("nav.traces")} collapsed={collapsed} />
           <SidebarItem to={ROUTES.EVENTS} icon={Radar} label={t("nav.realtimeEvents")} collapsed={collapsed} />
           <SidebarItem to={ROUTES.ACTIVITY} icon={ClipboardList} label={t("nav.activity")} collapsed={collapsed} />

@@ -39,6 +39,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
 	"github.com/nextlevelbuilder/goclaw/internal/tasks"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
+	"github.com/nextlevelbuilder/goclaw/pkg/browser"
 	"github.com/nextlevelbuilder/goclaw/pkg/protocol"
 )
 
@@ -128,6 +129,24 @@ func runGateway() {
 	}
 	if snapshotWorker != nil {
 		defer snapshotWorker.Stop()
+	}
+
+	// Wire browser managers (proxy, extension, audit) now that PG stores are available.
+	if browserMgr != nil {
+		if bt, ok := toolsReg.Get("browser"); ok {
+			if browserTool, ok := bt.(*browser.BrowserTool); ok {
+				encKey := os.Getenv("GOCLAW_ENCRYPTION_KEY")
+				if pgStores.BrowserProxies != nil {
+					browserTool.SetProxyManager(browser.NewProxyManager(pgStores.BrowserProxies, encKey, nil))
+				}
+				if pgStores.BrowserExtensions != nil {
+					browserTool.SetExtensionManager(browser.NewExtensionManager(pgStores.BrowserExtensions, nil))
+				}
+				if pgStores.BrowserAudit != nil && cfg.Tools.Browser.AuditEnabled {
+					browserTool.SetAuditLogger(browser.NewAuditLogger(pgStores.BrowserAudit, nil))
+				}
+			}
+		}
 	}
 
 	// Redis cache: compiled via build tags. Build with 'go build -tags redis' to enable.
@@ -488,6 +507,19 @@ func runGateway() {
 	// Media serve endpoint — serves persisted media files by ID for WS/web clients.
 	if mediaStore != nil {
 		server.SetMediaServeHandler(httpapi.NewMediaServeHandler(mediaStore))
+	}
+
+	// Browser live view handler
+	var browserLiveH *httpapi.BrowserLiveHandler
+	if browserMgr != nil && pgStores.ScreencastSessions != nil {
+		browserLiveH = httpapi.NewBrowserLiveHandler(pgStores.ScreencastSessions, browserMgr, nil)
+		server.SetBrowserLiveHandler(browserLiveH)
+		// Wire sessions store into browser tool for liveview.create token generation
+		if bt, ok := toolsReg.Get("browser"); ok {
+			if browserTool, ok := bt.(*browser.BrowserTool); ok {
+				browserTool.SetScreencastSessions(pgStores.ScreencastSessions)
+			}
+		}
 	}
 
 	// Seed + apply builtin tool disables
@@ -1050,6 +1082,65 @@ func runGateway() {
 		}
 		ttsTool.UpdateManager(newMgr)
 		slog.Info("tts config reloaded", "provider", newMgr.PrimaryProvider(), "auto", string(newMgr.AutoMode()))
+	})
+
+	// Reload browser manager on config changes via pub/sub.
+	// Only rebuilds when the browser config section actually changed.
+	var lastBrowserCfgJSON []byte // tracks serialized browser config for change detection
+	if cfg.Tools.Browser.Enabled {
+		lastBrowserCfgJSON, _ = json.Marshal(cfg.Tools.Browser)
+	}
+	msgBus.Subscribe("browser-config-reload", func(evt bus.Event) {
+		if evt.Name != bus.TopicConfigChanged {
+			return
+		}
+		updatedCfg, ok := evt.Payload.(*config.Config)
+		if !ok {
+			return
+		}
+
+		// Skip reload if browser config hasn't changed
+		newCfgJSON, _ := json.Marshal(updatedCfg.Tools.Browser)
+		if string(newCfgJSON) == string(lastBrowserCfgJSON) {
+			return
+		}
+		lastBrowserCfgJSON = newCfgJSON
+
+		bt, hasBT := toolsReg.Get("browser")
+		if !hasBT {
+			return
+		}
+		browserTool, ok := bt.(*browser.BrowserTool)
+		if !ok {
+			return
+		}
+		oldMgr := browserTool.Manager()
+
+		// Build new manager from updated config (reuses setupToolRegistry logic)
+		newMgr := buildBrowserManager(updatedCfg, workspace)
+		if newMgr == nil {
+			// Browser disabled — stop old manager
+			if oldMgr != nil {
+				oldMgr.Close()
+			}
+			slog.Info("browser disabled via config reload")
+			return
+		}
+
+		// Stop old manager (cleans up containers, Chrome processes, etc.)
+		if oldMgr != nil {
+			oldMgr.Close()
+		}
+
+		// Swap manager in BrowserTool + BrowserLiveHandler
+		browserTool.SetManager(newMgr)
+		if browserLiveH != nil {
+			browserLiveH.SetManager(newMgr)
+		}
+		// Update the outer browserMgr reference for defer Close()
+		browserMgr = newMgr
+
+		slog.Info("browser config reloaded", "mode", updatedCfg.Tools.Browser.Mode)
 	})
 
 	// Contact collector: auto-collect user info from channels with in-memory dedup cache.

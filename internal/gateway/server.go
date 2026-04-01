@@ -184,7 +184,7 @@ func (s *Server) BuildMux() *http.ServeMux {
 		if s.cfg.Gateway.Token != "" {
 			bridgeHandler := mcpbridge.NewBridgeServer(s.tools, "1.0.0", s.msgBus)
 			handler := tokenAuthMiddleware(s.cfg.Gateway.Token,
-				bridgeContextMiddleware(s.cfg.Gateway.Token, bridgeHandler))
+				bridgeContextMiddleware(s.cfg.Gateway.Token, s.agentStore, bridgeHandler))
 			mux.Handle("/mcp/bridge", handler)
 		} else {
 			slog.Warn("security.mcp_bridge_disabled: no gateway token configured, MCP bridge is disabled")
@@ -205,7 +205,8 @@ func (s *Server) BuildMux() *http.ServeMux {
 // access agent/user scope and resolve workspace-relative paths.
 // When a gateway token is configured, the context headers must be accompanied by
 // a valid X-Bridge-Sig HMAC to prevent forgery.
-func bridgeContextMiddleware(gatewayToken string, next http.Handler) http.Handler {
+// agentStore is used to lookup the agent key from agent UUID for session key rebuilding.
+func bridgeContextMiddleware(gatewayToken string, agentStore store.AgentStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		agentIDStr := r.Header.Get("X-Agent-ID")
@@ -226,8 +227,9 @@ func bridgeContextMiddleware(gatewayToken string, next http.Handler) http.Handle
 
 			// Verify HMAC signature over all context fields.
 			tenantIDStr := r.Header.Get("X-Tenant-ID")
+			sessionKey := r.Header.Get("X-Session-Key")
 			sig := r.Header.Get("X-Bridge-Sig")
-			ok, tenantVerified := providers.VerifyBridgeContext(gatewayToken, agentIDStr, userID, channel, chatID, peerKind, workspace, tenantIDStr, sig)
+			ok, tenantVerified := providers.VerifyBridgeContext(gatewayToken, agentIDStr, userID, channel, chatID, peerKind, workspace, tenantIDStr, sig, sessionKey)
 			if !ok {
 				slog.Warn("security.mcp_bridge: invalid bridge context signature",
 					"agent_id", agentIDStr, "user_id", userID)
@@ -235,20 +237,30 @@ func bridgeContextMiddleware(gatewayToken string, next http.Handler) http.Handle
 				return
 			}
 
-			if agentIDStr != "" {
-				if id, err := uuid.Parse(agentIDStr); err == nil {
-					ctx = store.WithAgentID(ctx, id)
-				}
-			}
-			if userID != "" {
-				ctx = store.WithUserID(ctx, userID)
-			}
-			// Only inject tenant_id when HMAC actually covers it (level 1).
-			// Fallback levels (pre-tenantID sessions) must not trust unsigned tenant headers.
+			// Inject tenant_id first — needed by agentStore.GetByID which is tenant-scoped.
 			if tenantVerified && tenantIDStr != "" {
 				if tid, err := uuid.Parse(tenantIDStr); err == nil {
 					ctx = store.WithTenantID(ctx, tid)
 				}
+			}
+			if agentIDStr != "" {
+				if id, err := uuid.Parse(agentIDStr); err == nil {
+					ctx = store.WithAgentID(ctx, id)
+
+					// Lookup agent key from UUID for browser tab tracking.
+					if agentStore != nil {
+						if ag, err := agentStore.GetByID(ctx, id); err == nil && ag != nil {
+							ctx = store.WithAgentKey(ctx, ag.AgentKey)
+						}
+					}
+				}
+			}
+			// Inject session key from HMAC-verified header.
+			if sessionKey != "" {
+				ctx = tools.WithToolSessionKey(ctx, sessionKey)
+			}
+			if userID != "" {
+				ctx = store.WithUserID(ctx, userID)
 			}
 		}
 
@@ -487,6 +499,11 @@ func (s *Server) SetDocsHandler(h *httpapi.DocsHandler) { s.handlers = append(s.
 
 // SetEditionHandler sets the edition info handler.
 func (s *Server) SetEditionHandler(h *httpapi.EditionHandler) { s.handlers = append(s.handlers, h) }
+
+// SetBrowserLiveHandler sets the browser live view handler.
+func (s *Server) SetBrowserLiveHandler(h *httpapi.BrowserLiveHandler) {
+	s.handlers = append(s.handlers, h)
+}
 
 // SetAgentStore sets the agent store for context injection in tools_invoke.
 func (s *Server) SetAgentStore(as store.AgentStore) { s.agentStore = as }
