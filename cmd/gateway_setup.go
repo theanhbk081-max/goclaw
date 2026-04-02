@@ -98,7 +98,7 @@ func setupToolRegistry(
 			switch {
 			case cfg.Tools.Browser.RemoteURL != "":
 				mode = "remote"
-			case cfg.Tools.Browser.ContainerImage != "":
+			case cfg.Tools.Browser.ImagePreset == "stealth" || cfg.Tools.Browser.ImagePreset == "custom":
 				mode = "docker"
 			default:
 				mode = "host"
@@ -112,7 +112,12 @@ func setupToolRegistry(
 		case "docker":
 			containerImage := cfg.Tools.Browser.ContainerImage
 			if containerImage == "" {
-				containerImage = browser.DefaultContainerImage
+				switch cfg.Tools.Browser.ImagePreset {
+				case "stealth":
+					containerImage = browser.StealthContainerImage
+				default:
+					containerImage = browser.DefaultContainerImage
+				}
 			}
 			poolSize := cfg.Tools.Browser.ContainerPool
 			if poolSize <= 0 {
@@ -133,7 +138,7 @@ func setupToolRegistry(
 			if cfg.Tools.Browser.ProxyURL != "" {
 				opts = append(opts, browser.WithProxy(cfg.Tools.Browser.ProxyURL))
 			}
-			slog.Info("browser tool enabled", "mode", "docker", "image", containerImage, "pool", poolSize)
+			slog.Info("browser tool enabled", "mode", "docker", "image", containerImage, "pool", poolSize, "preset", cfg.Tools.Browser.ImagePreset)
 		case "k8s":
 			// Kubernetes engine setup — namespace and image are required
 			slog.Info("browser tool enabled", "mode", "k8s", "namespace", cfg.Tools.Browser.K8sNamespace, "image", cfg.Tools.Browser.K8sImage)
@@ -647,8 +652,6 @@ func buildBrowserManager(cfg *config.Config, workspace string) *browser.Manager 
 		switch {
 		case cfg.Tools.Browser.RemoteURL != "":
 			mode = "remote"
-		case cfg.Tools.Browser.ContainerImage != "":
-			mode = "docker"
 		default:
 			mode = "host"
 		}
@@ -660,7 +663,12 @@ func buildBrowserManager(cfg *config.Config, workspace string) *browser.Manager 
 	case "docker":
 		containerImage := cfg.Tools.Browser.ContainerImage
 		if containerImage == "" {
-			containerImage = browser.DefaultContainerImage
+			switch cfg.Tools.Browser.ImagePreset {
+			case "stealth":
+				containerImage = browser.StealthContainerImage
+			default:
+				containerImage = browser.DefaultContainerImage
+			}
 		}
 		poolSize := cfg.Tools.Browser.ContainerPool
 		if poolSize <= 0 {

@@ -120,13 +120,15 @@ func (e *ChromeEngine) NewPage(ctx context.Context, url string) (Page, error) {
 	}
 
 	// Inject stealth + fingerprint via Page.addScriptToEvaluateOnNewDocument.
-	// This ensures the script runs before ANY JS on the target page,
-	// which is critical for defeating navigator.webdriver checks.
+	// RunImmediately=true ensures the script runs on the CURRENT about:blank
+	// context AND on all future navigations. Without it, Chrome re-applies
+	// navigator.webdriver=true during navigation before our script fires.
 	fp := GenerateFingerprint("")
 	stealthScript := stealthOnNewDocumentJS + "\n" + FingerprintOnNewDocumentJS(fp)
-	if _, err := rodPage.EvalOnNewDocument(stealthScript); err != nil {
-		e.logger.Warn("stealth EvalOnNewDocument failed", "error", err)
-	}
+	_, _ = proto.PageAddScriptToEvaluateOnNewDocument{
+		Source:         stealthScript,
+		RunImmediately: true,
+	}.Call(rodPage)
 
 	// Override UA at CDP/network level so HTTP request headers match the
 	// fingerprint. JS-only overrides don't change the actual User-Agent header
@@ -135,6 +137,13 @@ func (e *ChromeEngine) NewPage(ctx context.Context, url string) (Page, error) {
 		UserAgent:      fp.UserAgent,
 		AcceptLanguage: strings.Join(fp.Languages, ","),
 		Platform:       fp.Platform,
+	}.Call(rodPage)
+
+	// Override navigator.language/languages at CDP level.
+	// JS overrides on Navigator.prototype get reset by Chrome on navigation,
+	// but Emulation.setLocaleOverride persists across navigations.
+	_ = proto.EmulationSetLocaleOverride{
+		Locale: fp.Languages[0],
 	}.Call(rodPage)
 
 	// Set viewport to match fingerprint screen dimensions.
@@ -149,11 +158,6 @@ func (e *ChromeEngine) NewPage(ctx context.Context, url string) (Page, error) {
 
 	// Bypass CSP so stealth scripts can override properties on strict pages.
 	_ = proto.PageSetBypassCSP{Enabled: true}.Call(rodPage)
-
-	// Remove CDP "webdriver" flag at protocol level.
-	// Chrome sets navigator.webdriver=true automatically for CDP-controlled pages.
-	// This CDP call tells Chrome NOT to set it.
-	_ = proto.EmulationSetAutomationOverride{Enabled: false}.Call(rodPage)
 
 	// Now navigate — stealth scripts will run before page JS.
 	if url != "" && url != "about:blank" {

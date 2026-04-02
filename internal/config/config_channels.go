@@ -410,6 +410,7 @@ type BrowserToolConfig struct {
 	ViewportWidth    int     `json:"viewport_width,omitempty"`       // default viewport width (default 1280)
 	ViewportHeight   int     `json:"viewport_height,omitempty"`      // default viewport height (default 720)
 	AuditEnabled     bool    `json:"audit_enabled"`                  // enable browser action audit logging
+	ImagePreset      string  `json:"image_preset,omitempty"`         // "basic" (default, headless-shell), "stealth" (goclaw/chromium anti-bot), "custom" (user container_image)
 	ContainerImage   string  `json:"container_image,omitempty"`      // Docker image for container engine (e.g. "chromedp/headless-shell:latest")
 	ContainerNetwork string  `json:"container_network,omitempty"`    // Docker network name
 	ContainerMemory  int     `json:"container_memory_mb,omitempty"`  // Memory limit per container (MB)
@@ -430,6 +431,7 @@ type BrowserToolConfig struct {
 	K8sPodTimeoutHours  int               `json:"k8s_pod_timeout_hours,omitempty"`  // Default pod expiry in hours (default 2)
 	K8sHeartbeatMin     int               `json:"k8s_heartbeat_min,omitempty"`      // Heartbeat interval in minutes (default 5)
 	K8sOrphanTimeoutMin int               `json:"k8s_orphan_timeout_min,omitempty"` // Kill orphan pods after N minutes without heartbeat (default 15)
+	PublicURL           string            `json:"public_url,omitempty"`             // Public base URL for shareable live view links (e.g. "https://goclaw.example.com"). When set, liveview.create returns full URLs instead of relative paths
 }
 
 // ToolPolicySpec defines a tool policy at any level (global, per-agent, per-provider).

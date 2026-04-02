@@ -132,6 +132,7 @@ func FingerprintInjectionJS(fp *Fingerprint) string {
 		Object.defineProperty(navigator, 'platform', { get: () => %q });
 		Object.defineProperty(navigator, 'vendor', { get: () => %q });
 		Object.defineProperty(navigator, 'languages', { get: () => %s });
+		Object.defineProperty(navigator, 'language', { get: () => %q });
 		Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => %d });
 		Object.defineProperty(navigator, 'deviceMemory', { get: () => %d });
 		Object.defineProperty(navigator, 'maxTouchPoints', { get: () => %d });
@@ -159,7 +160,7 @@ func FingerprintInjectionJS(fp *Fingerprint) string {
 		};
 	}`,
 		fp.UserAgent, fp.Platform, fp.Vendor,
-		languagesJSON(fp.Languages),
+		languagesJSON(fp.Languages), fp.Languages[0],
 		fp.HardwareConcurrency, fp.DeviceMemory, fp.MaxTouchPoints,
 		fp.ScreenWidth, fp.ScreenHeight,
 		fp.ScreenWidth, fp.ScreenHeight-40,
@@ -179,6 +180,7 @@ Object.defineProperty(navigator, 'userAgent', { get: () => %q });
 Object.defineProperty(navigator, 'platform', { get: () => %q });
 Object.defineProperty(navigator, 'vendor', { get: () => %q });
 Object.defineProperty(navigator, 'languages', { get: () => %s, configurable: true });
+Object.defineProperty(navigator, 'language', { get: () => %q, configurable: true });
 Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => %d });
 Object.defineProperty(navigator, 'deviceMemory', { get: () => %d });
 Object.defineProperty(navigator, 'maxTouchPoints', { get: () => %d });
@@ -218,7 +220,7 @@ WebGLRenderingContext.prototype.getParameter = function(param) {
 };
 `,
 		fp.UserAgent, fp.Platform, fp.Vendor,
-		languagesJSON(fp.Languages),
+		languagesJSON(fp.Languages), fp.Languages[0],
 		fp.HardwareConcurrency, fp.DeviceMemory, fp.MaxTouchPoints,
 		// screen dimensions (all consistent)
 		fp.ScreenWidth, fp.ScreenHeight,

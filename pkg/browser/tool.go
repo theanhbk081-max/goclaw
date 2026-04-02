@@ -20,6 +20,7 @@ type BrowserTool struct {
 	extension *ExtensionManager
 	audit     *AuditLogger
 	sessions  store.ScreencastSessionStore
+	publicURL string // base URL for shareable live view links (e.g. "https://goclaw.example.com")
 }
 
 // NewBrowserTool creates a BrowserTool wrapping a Manager and optional managers.
@@ -46,6 +47,9 @@ func (t *BrowserTool) SetAuditLogger(al *AuditLogger) { t.audit = al }
 
 // SetScreencastSessions sets the screencast session store (wired after stores are initialized).
 func (t *BrowserTool) SetScreencastSessions(ss store.ScreencastSessionStore) { t.sessions = ss }
+
+// SetPublicURL sets the base URL for shareable live view links.
+func (t *BrowserTool) SetPublicURL(u string) { t.publicURL = u }
 
 // SetManager replaces the underlying browser Manager (used for config hot-reload).
 func (t *BrowserTool) SetManager(m *Manager) { t.manager = m }
@@ -97,7 +101,7 @@ Actions:
 - audit.list: List browser audit log entries (optional auditAction, auditLimit)
 - storage.purge: Purge a browser profile session (requires profile)
 - storage.cleanup: Remove old profiles (requires maxAge in hours)
-- liveview.create: Create a live view session (requires targetId; optional mode: view/takeover)
+- liveview.create: Create a shareable public link for a browser tab (requires targetId; optional mode: view/takeover). IMPORTANT: Only use this when the user explicitly asks to share or create a public link. Do NOT call this automatically when opening or navigating tabs — the user can already see the browser live in the chat panel without a token.
 
 Act kinds: click, type, press, hover, wait, evaluate
 - click: Click element (request: {kind:"click", ref:"e1"})

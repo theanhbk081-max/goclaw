@@ -196,15 +196,38 @@ export function BrowserRuntimeSection({ data, onSave, saving }: Props) {
         {resolvedMode === "docker" && (
           <div className="space-y-3 rounded-md border p-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <InfoLabel tip={t("tools.browserContainerImageTip")}>{t("tools.browserContainerImage")}</InfoLabel>
-                <Input
-                  value={browser.container_image ?? ""}
-                  onChange={(e) => updateBrowser({ container_image: e.target.value })}
-                  placeholder="chromedp/headless-shell:latest"
-                  className="font-mono text-base md:text-xs"
-                />
+              <div className="grid gap-1.5 sm:col-span-2">
+                <InfoLabel tip={t("tools.browserImagePresetTip")}>{t("tools.browserImagePreset")}</InfoLabel>
+                <div className="flex flex-wrap gap-1">
+                  {(["basic", "stealth", "custom"] as const).map((p) => (
+                    <Button
+                      key={p}
+                      variant={(browser.image_preset ?? "basic") === p ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => updateBrowser({ image_preset: p, ...(p !== "custom" ? { container_image: "" } : {}) })}
+                    >
+                      {t(`tools.browserImagePreset_${p}`)}
+                    </Button>
+                  ))}
+                </div>
+                {(browser.image_preset ?? "basic") === "basic" && (
+                  <p className="text-xs text-muted-foreground">{t("tools.browserImagePresetBasicDesc")}</p>
+                )}
+                {browser.image_preset === "stealth" && (
+                  <p className="text-xs text-muted-foreground">{t("tools.browserImagePresetStealthDesc")}</p>
+                )}
               </div>
+              {browser.image_preset === "custom" && (
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">{t("tools.browserContainerImage")}</Label>
+                  <Input
+                    value={browser.container_image ?? ""}
+                    onChange={(e) => updateBrowser({ container_image: e.target.value })}
+                    placeholder="my-registry/chrome:latest"
+                    className="font-mono text-base md:text-xs"
+                  />
+                </div>
+              )}
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">{t("tools.browserDockerNetwork")}</Label>
                 <Input

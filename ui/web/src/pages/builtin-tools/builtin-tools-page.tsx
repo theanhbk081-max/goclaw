@@ -28,7 +28,10 @@ const CATEGORY_ORDER = [
   "sessions", "messaging", "scheduling", "subagents", "skills", "delegation", "teams",
 ];
 
+const ALWAYS_EDITABLE = new Set(["browser"]);
+
 function hasEditableSettings(tool: BuiltinToolData): boolean {
+  if (ALWAYS_EDITABLE.has(tool.name)) return true;
   return tool.settings != null && Object.keys(tool.settings).length > 0;
 }
 

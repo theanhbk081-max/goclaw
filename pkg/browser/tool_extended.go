@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -546,11 +548,36 @@ func (t *BrowserTool) handleLiveViewCreate(ctx context.Context, args map[string]
 		return tools.ErrorResult(fmt.Sprintf("failed to create live view session: %v", err))
 	}
 
+	path := "/browser/live/" + token
+	shareURL := path
+	if u := t.resolvePublicURL(ctx); u != "" {
+		shareURL = u + path
+	}
+
 	return jsonResult(map[string]string{
-		"url":       "/browser/live/" + token,
+		"url":       shareURL,
 		"token":     token,
 		"targetId":  targetID,
 		"expiresAt": expiresAt.Format(time.RFC3339),
 		"mode":      mode,
 	})
+}
+
+// browserSettings is the JSON schema for builtin_tools.settings["browser"].
+type browserSettings struct {
+	PublicURL string `json:"public_url,omitempty"`
+}
+
+// resolvePublicURL returns the public base URL for share links.
+// Priority: DB settings (from context) > struct field (from config/env).
+func (t *BrowserTool) resolvePublicURL(ctx context.Context) string {
+	if settings := tools.BuiltinToolSettingsFromCtx(ctx); settings != nil {
+		if raw, ok := settings["browser"]; ok && len(raw) > 0 {
+			var s browserSettings
+			if json.Unmarshal(raw, &s) == nil && s.PublicURL != "" {
+				return strings.TrimRight(s.PublicURL, "/")
+			}
+		}
+	}
+	return strings.TrimRight(t.publicURL, "/")
 }

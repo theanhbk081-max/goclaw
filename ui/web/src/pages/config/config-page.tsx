@@ -1,5 +1,6 @@
 import { Settings, RefreshCw, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useParams, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,10 +25,17 @@ import { CronSection } from "./sections/cron-section";
 import { TelemetrySection } from "./sections/telemetry-section";
 import { BindingsSection } from "./sections/bindings-section";
 
+const VALID_SECTIONS = new Set(["server", "behavior", "aiDefaults", "quota", "tools", "integrations"]);
+const DEFAULT_SECTION = "server";
+
 export function ConfigPage() {
   const { t } = useTranslation("config");
+  const { section } = useParams<{ section?: string }>();
+  const navigate = useNavigate();
   const { config, hash, loading, saving, refresh, patch } = useConfig();
   const isMobile = useIsMobile();
+
+  const activeTab = section && VALID_SECTIONS.has(section) ? section : DEFAULT_SECTION;
   const spinning = useMinLoading(loading);
   const showSkeleton = useDeferredLoading(loading && !config);
 
@@ -86,7 +94,7 @@ export function ConfigPage() {
         <span>{t("warning")}</span>
       </div>
 
-      <Tabs orientation={isMobile ? "horizontal" : "vertical"} defaultValue="server" className="mt-4 items-start">
+      <Tabs orientation={isMobile ? "horizontal" : "vertical"} value={activeTab} onValueChange={(v) => navigate(`/config/${v}`, { replace: true })} className="mt-4 items-start">
         <TabsList
           variant={isMobile ? "default" : "line"}
           className={isMobile

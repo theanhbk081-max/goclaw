@@ -514,10 +514,13 @@ func runGateway() {
 	if browserMgr != nil && pgStores.ScreencastSessions != nil {
 		browserLiveH = httpapi.NewBrowserLiveHandler(pgStores.ScreencastSessions, browserMgr, nil)
 		server.SetBrowserLiveHandler(browserLiveH)
-		// Wire sessions store into browser tool for liveview.create token generation
+		// Wire sessions store + public URL into browser tool for liveview.create token generation
 		if bt, ok := toolsReg.Get("browser"); ok {
 			if browserTool, ok := bt.(*browser.BrowserTool); ok {
 				browserTool.SetScreencastSessions(pgStores.ScreencastSessions)
+				if u := cfg.Tools.Browser.PublicURL; u != "" {
+					browserTool.SetPublicURL(u)
+				}
 			}
 		}
 	}
@@ -527,6 +530,7 @@ func runGateway() {
 		seedBuiltinTools(context.Background(), pgStores.BuiltinTools)
 		migrateBuiltinToolSettings(context.Background(), pgStores.BuiltinTools)
 		backfillWebFetchSettings(context.Background(), pgStores.BuiltinTools)
+		backfillBrowserSettings(context.Background(), pgStores.BuiltinTools, cfg.Tools.Browser.PublicURL)
 		applyBuiltinToolDisables(context.Background(), pgStores.BuiltinTools, toolsReg)
 	}
 

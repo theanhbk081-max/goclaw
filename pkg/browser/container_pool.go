@@ -71,6 +71,12 @@ func (p *ContainerPoolEngine) Launch(opts LaunchOpts) error {
 	}
 	p.logger.Info("container pool engine ready", "docker", strings.TrimSpace(string(out)), "image", p.image, "maxPool", p.maxPool)
 
+	// Ensure image exists before any container is created.
+	// For goclaw/* images this auto-builds on first run (~2-5 min).
+	if err := ensureImage(p.image, p.logger); err != nil {
+		return fmt.Errorf("ensure image: %w", err)
+	}
+
 	p.proxyURL = opts.ProxyURL
 	p.launched = true
 	return nil
@@ -87,6 +93,12 @@ func (p *ContainerPoolEngine) NewPage(ctx context.Context, url string) (Page, er
 	entry, err := p.getOrCreate(key, profileDir)
 	if err != nil {
 		return nil, fmt.Errorf("container pool: get engine for %q: %w", key, err)
+	}
+	// Check if the caller's context expired while waiting for container launch.
+	// Container launch (waitForCDP) takes up to 60s, but the caller's action
+	// timeout is typically 30s. The container stays in the pool for next request.
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("container pool: context expired while waiting for container launch (container is ready for next request): %w", ctx.Err())
 	}
 	return entry.engine.NewPage(ctx, url)
 }
@@ -171,6 +183,10 @@ func (p *ContainerPoolEngine) Name() string { return "container-pool" }
 
 // getOrCreate returns an existing pool entry or creates a new container.
 func (p *ContainerPoolEngine) getOrCreate(key, profileDir string) (*poolEntry, error) {
+	return p.getOrCreateRetry(key, profileDir, 2)
+}
+
+func (p *ContainerPoolEngine) getOrCreateRetry(key, profileDir string, retries int) (*poolEntry, error) {
 	p.mu.Lock()
 
 	// Check existing entry
@@ -179,13 +195,16 @@ func (p *ContainerPoolEngine) getOrCreate(key, profileDir string) (*poolEntry, e
 		p.mu.Unlock()
 		<-entry.ready
 		if entry.err != nil {
+			if retries <= 0 {
+				return nil, fmt.Errorf("container launch failed after retries: %w", entry.err)
+			}
 			// Previous launch failed — remove and retry
 			p.mu.Lock()
 			if p.engines[key] == entry {
 				delete(p.engines, key)
 			}
 			p.mu.Unlock()
-			return p.getOrCreate(key, profileDir)
+			return p.getOrCreateRetry(key, profileDir, retries-1)
 		}
 		// Check if container is still alive
 		if entry.engine.IsConnected() {
@@ -194,6 +213,9 @@ func (p *ContainerPoolEngine) getOrCreate(key, profileDir string) (*poolEntry, e
 			p.mu.Unlock()
 			return entry, nil
 		}
+		if retries <= 0 {
+			return nil, fmt.Errorf("container dead and no retries left for key %q", key)
+		}
 		// Dead container — cleanup and recreate
 		entry.engine.Close()
 		p.mu.Lock()
@@ -201,7 +223,7 @@ func (p *ContainerPoolEngine) getOrCreate(key, profileDir string) (*poolEntry, e
 			delete(p.engines, key)
 		}
 		p.mu.Unlock()
-		return p.getOrCreate(key, profileDir)
+		return p.getOrCreateRetry(key, profileDir, retries-1)
 	}
 
 	// Evict if at capacity

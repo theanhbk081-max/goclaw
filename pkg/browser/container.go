@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -48,9 +50,15 @@ func WithContainerNetwork(network string) ContainerOpt {
 }
 
 // DefaultContainerImage is the default Docker image for container engine.
-// chromedp/headless-shell binds to 0.0.0.0 out of the box and supports screencast
-// since Chrome 132+ (headless-shell IS new headless, old headless was removed).
+// chromedp/headless-shell is lightweight and fast but uses --headless=old which
+// limits stealth (navigator.webdriver stays true despite flags).
+// For full stealth, use StealthContainerImage (goclaw/chromium) which runs
+// --headless=new and properly supports --disable-blink-features.
 const DefaultContainerImage = "chromedp/headless-shell:latest"
+
+// StealthContainerImage is a full Chromium image with --headless=new support.
+// Use this when anti-bot stealth is required (e.g. Google, Cloudflare sites).
+const StealthContainerImage = "goclaw/chromium:latest"
 
 // NewContainerEngine creates a ContainerEngine that will use the given Docker image.
 func NewContainerEngine(image string, logger *slog.Logger, opts ...ContainerOpt) *ContainerEngine {
@@ -97,26 +105,16 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 	}
 	e.stopContainer()
 
-	// Find a free port
-	port, err := freePort()
-	if err != nil {
-		return fmt.Errorf("find free port: %w", err)
-	}
-	e.cdpPort = port
-
 	// Build docker run command.
-	// chromedp/headless-shell: has its own run.sh that binds to 0.0.0.0:9222.
-	//   No Chrome flags needed — just pass the image name.
-	// zenika/alpine-chrome: entrypoint = ["chromium-browser","--headless"] which
-	//   binds to 127.0.0.1 only. Override entrypoint to bind to 0.0.0.0.
-	// Other images: pass full Chrome flags for maximum compat.
-	isHeadlessShell := strings.Contains(e.image, "headless-shell")
+	// Let Docker pick the host port (-p 127.0.0.1::9222) to avoid TOCTOU race
+	// with freePort(). We read the actual assigned port via `docker port` after start.
+	hasSocatEntrypoint := strings.Contains(e.image, "goclaw/") || strings.Contains(e.image, "headless-shell")
 	isZenika := strings.Contains(e.image, "zenika/alpine-chrome")
 
 	args := []string{
-		"run", "-d", "--rm",
-		"-p", fmt.Sprintf("%d:9222", port),
-		"--shm-size=256m", // Chrome needs shared memory for rendering
+		"run", "-d",
+		"-p", "127.0.0.1::9222",
+		"--shm-size=512m", // Chrome needs shared memory for rendering
 	}
 
 	// Resource limits
@@ -136,6 +134,9 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 		args = append(args, "--label", "goclaw.profile="+opts.ProfileDir)
 	}
 
+	// Force English locale inside container — prevents leaking host locale
+	args = append(args, "-e", "LANG=en_US.UTF-8", "-e", "LANGUAGE=en_US:en")
+
 	// Pass proxy if configured
 	if opts.ProxyURL != "" {
 		args = append(args, "-e", "CHROME_PROXY="+opts.ProxyURL)
@@ -145,10 +146,15 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 	userDataDirFlag := ""
 	if opts.ProfileDir != "" {
 		userDataDirFlag = "--user-data-dir=/data/profile"
+		// Remove Chromium singleton lock files from previous container.
+		// Each container has a different hostname, so Chromium sees stale locks
+		// as "profile in use by another computer" and exits with code 21.
+		for _, lockFile := range []string{"SingletonLock", "SingletonCookie", "SingletonSocket"} {
+			os.Remove(opts.ProfileDir + "/" + lockFile)
+		}
 	}
 
-	// Stealth flags for container Chrome — same as StealthFlags() for local launcher.
-	// Without these, Chrome in Docker runs with full automation signals exposed.
+	// Stealth flags — passed as Chrome command-line args inside the container.
 	containerStealthFlags := []string{
 		"--disable-blink-features=AutomationControlled",
 		"--disable-features=AutomationControlled,TranslateUI,EnableAutomation",
@@ -170,12 +176,14 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 		"--disable-webrtc-hw-decoding",
 		"--disable-webrtc-hw-encoding",
 		"--window-size=1920,1080",
+		"--lang=en-US",
+		"--accept-lang=en-US,en",
 	}
 
 	switch {
-	case isHeadlessShell:
-		// chromedp/headless-shell: run.sh passes $@ to the binary, so we can
-		// append stealth flags without overriding the entrypoint.
+	case hasSocatEntrypoint:
+		// goclaw/chromium and headless-shell: entrypoint runs socat proxy
+		// (0.0.0.0:9222 → 127.0.0.1:9223) then exec's Chrome with $@ appended.
 		args = append(args, e.image)
 		args = append(args, containerStealthFlags...)
 		if userDataDirFlag != "" {
@@ -198,7 +206,7 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 		args = append(args, "--entrypoint", "chromium-browser", e.image)
 		args = append(args, chromeArgs...)
 	default:
-		// Generic Chrome/Chromium image: pass all flags explicitly
+		// Generic image: pass all Chrome flags explicitly
 		chromeArgs := []string{
 			"--no-sandbox",
 			"--disable-dev-shm-usage",
@@ -220,31 +228,48 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 
 	// Start container
 	cmd := exec.Command("docker", args...)
+	e.logger.Info("docker run command", "cmd", "docker "+strings.Join(args, " "))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("docker run: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
 	e.containerID = strings.TrimSpace(string(out))
+
+	// Read the actual host port Docker assigned via `docker port`.
+	port, err := e.readAssignedPort()
+	if err != nil {
+		e.logger.Error("failed to read Docker-assigned port", "error", err,
+			"container", e.containerID[:min(12, len(e.containerID))])
+		e.dumpContainerLogs()
+		e.stopContainer()
+		return fmt.Errorf("read assigned port: %w", err)
+	}
+	e.cdpPort = port
+
 	if len(e.containerID) > 12 {
 		e.logger.Info("container started", "id", e.containerID[:12], "port", port, "image", e.image)
 	}
 
 	// Wait for CDP to be ready
 	cdpURL := fmt.Sprintf("http://127.0.0.1:%d", port)
-	if err := waitForCDP(cdpURL, 30*time.Second, e.logger); err != nil {
-		// Grab container logs for debugging before cleanup
-		if logOut, logErr := exec.Command("docker", "logs", "--tail", "20", e.containerID).CombinedOutput(); logErr == nil {
-			e.logger.Warn("container logs before cleanup", "logs", strings.TrimSpace(string(logOut)))
-		}
+	if err := waitForCDP(cdpURL, 60*time.Second, e.logger, e.containerID); err != nil {
+		e.logger.Error("CDP not ready after 60s — killing container",
+			"port", port, "image", e.image, "container", e.containerID[:min(12, len(e.containerID))])
+		e.dumpContainerLogs()
 		e.stopContainer()
 		return fmt.Errorf("wait for CDP: %w", err)
 	}
 
 	// Create inner ChromeEngine connected via remote CDP
 	inner := NewChromeEngine(e.logger)
+	remoteWS := fmt.Sprintf("ws://127.0.0.1:%d", port)
 	if err := inner.Launch(LaunchOpts{
-		RemoteURL: fmt.Sprintf("ws://127.0.0.1:%d", port),
+		RemoteURL: remoteWS,
 	}); err != nil {
+		e.logger.Error("rod WebSocket connection to container failed — killing container",
+			"port", port, "remoteURL", remoteWS, "error", err,
+			"container", e.containerID[:min(12, len(e.containerID))])
+		e.dumpContainerLogs()
 		e.stopContainer()
 		return fmt.Errorf("connect to container Chrome: %w", err)
 	}
@@ -274,6 +299,45 @@ func isContainerRunning(containerID string) bool {
 		return false
 	}
 	return strings.TrimSpace(string(out)) == "true"
+}
+
+// readAssignedPort reads the host port Docker assigned for container port 9222.
+func (e *ContainerEngine) readAssignedPort() (int, error) {
+	if e.containerID == "" {
+		return 0, fmt.Errorf("no container ID")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "docker", "port", e.containerID, "9222").CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("docker port: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	// Output format: "127.0.0.1:12345\n" or "0.0.0.0:12345\n[::]:12345\n"
+	line := strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+	_, portStr, splitErr := net.SplitHostPort(line)
+	if splitErr != nil {
+		return 0, fmt.Errorf("parse docker port output %q: %w", line, splitErr)
+	}
+	port, err := net.LookupPort("tcp", portStr)
+	if err != nil {
+		return 0, fmt.Errorf("parse port %q: %w", portStr, err)
+	}
+	return port, nil
+}
+
+// dumpContainerLogs fetches and logs the last 30 lines of container stderr/stdout.
+func (e *ContainerEngine) dumpContainerLogs() {
+	if e.containerID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	logOut, err := exec.CommandContext(ctx, "docker", "logs", "--tail", "30", e.containerID).CombinedOutput()
+	if err != nil {
+		e.logger.Warn("failed to fetch container logs", "error", err)
+		return
+	}
+	e.logger.Error("container logs (last 30 lines)", "logs", strings.TrimSpace(string(logOut)))
 }
 
 func (e *ContainerEngine) stopContainer() {
@@ -359,32 +423,159 @@ func freePort() (int, error) {
 }
 
 // waitForCDP polls the Chrome /json/version endpoint until ready or timeout.
-func waitForCDP(baseURL string, timeout time.Duration, logger *slog.Logger) error {
+// containerID is optional — if provided, enables mid-poll container health checks.
+func waitForCDP(baseURL string, timeout time.Duration, logger *slog.Logger, containerID ...string) error {
 	deadline := time.Now().Add(timeout)
 	client := &http.Client{Timeout: 2 * time.Second}
 	url := baseURL + "/json/version"
 
 	var lastErr error
 	attempts := 0
+	connRefusedCount := 0
+	cid := ""
+	if len(containerID) > 0 {
+		cid = containerID[0]
+	}
 	for time.Now().Before(deadline) {
 		attempts++
 		resp, err := client.Get(url)
 		if err != nil {
 			lastErr = err
+			if strings.Contains(err.Error(), "connection refused") {
+				connRefusedCount++
+			}
+			// Log first 3 attempts + every 10th at WARN level so it's visible at default log level
+			if attempts <= 3 || attempts%10 == 0 {
+				if logger != nil {
+					logger.Warn("CDP poll failed", "attempt", attempts, "url", url, "error", err, "connRefused", connRefusedCount)
+				}
+			}
+			// After 10s of connection refused, check if container is still alive
+			if connRefusedCount == 20 && cid != "" {
+				alive := isContainerRunning(cid)
+				if logger != nil {
+					logger.Warn("CDP connection refused for 10s — container health check",
+						"containerID", cid[:min(12, len(cid))], "alive", alive)
+				}
+				if !alive {
+					// Container dead — dump logs before returning (no --rm so container stays)
+					ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+					logOut, logErr := exec.CommandContext(ctx2, "docker", "logs", "--tail", "50", cid).CombinedOutput()
+					cancel2()
+					if logErr == nil {
+						logger.Error("DEAD container logs", "logs", strings.TrimSpace(string(logOut)))
+					} else {
+						logger.Error("failed to get dead container logs", "error", logErr)
+					}
+					// Also get exit code
+					ctx3, cancel3 := context.WithTimeout(context.Background(), 5*time.Second)
+					exitOut, _ := exec.CommandContext(ctx3, "docker", "inspect", "-f", "{{.State.ExitCode}} {{.State.Error}}", cid).CombinedOutput()
+					cancel3()
+					logger.Error("container exit info", "info", strings.TrimSpace(string(exitOut)))
+					return fmt.Errorf("container %s died during CDP wait (connection refused x%d)", cid[:min(12, len(cid))], connRefusedCount)
+				}
+				// Container alive but port not reachable — check port mapping from Docker side
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				portOut, portErr := exec.CommandContext(ctx, "docker", "port", cid, "9222").CombinedOutput()
+				cancel()
+				if logger != nil {
+					logger.Warn("CDP mid-poll port check", "dockerPort", strings.TrimSpace(string(portOut)), "error", portErr)
+				}
+			}
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
-		var result map[string]any
-		json.NewDecoder(resp.Body).Decode(&result)
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		var result map[string]any
+		if jsonErr := json.Unmarshal(body, &result); jsonErr != nil {
+			lastErr = fmt.Errorf("invalid JSON from CDP: %s (body: %s)", jsonErr, string(body[:min(200, len(body))]))
+			if logger != nil {
+				logger.Warn("CDP poll: invalid JSON", "attempt", attempts, "body", string(body[:min(200, len(body))]))
+			}
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
 		if result["webSocketDebuggerUrl"] != nil {
 			if logger != nil {
 				logger.Info("CDP ready", "url", baseURL, "attempts", attempts)
 			}
 			return nil
 		}
-		lastErr = fmt.Errorf("missing webSocketDebuggerUrl in response")
+		lastErr = fmt.Errorf("missing webSocketDebuggerUrl in response: %s", string(body[:min(200, len(body))]))
+		if logger != nil {
+			logger.Warn("CDP poll: missing webSocketDebuggerUrl", "attempt", attempts, "response", string(body[:min(200, len(body))]))
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return fmt.Errorf("CDP not ready after %s (%d attempts, last error: %v)", timeout, attempts, lastErr)
+	if connRefusedCount == attempts {
+		return fmt.Errorf("CDP not ready after %s (%d attempts, ALL connection refused — port %s likely not mapped or socat not running)", timeout, attempts, url)
+	}
+	return fmt.Errorf("CDP not ready after %s (%d attempts, %d connection refused, last error: %v)", timeout, attempts, connRefusedCount, lastErr)
+}
+
+// ensureImage checks if the Docker image exists locally and auto-builds it if
+// it's a goclaw/* image. Called once at pool startup so individual containers
+// don't race to build the same image.
+func ensureImage(image string, logger *slog.Logger) error {
+	if imageExists(image) {
+		return nil
+	}
+	if !strings.HasPrefix(image, "goclaw/") {
+		return fmt.Errorf("image %s not found locally (pull it first)", image)
+	}
+	logger.Info("building container image (first run, may take a few minutes)", "image", image)
+	if err := buildGoclawChromium(image); err != nil {
+		return fmt.Errorf("auto-build %s: %w", image, err)
+	}
+	logger.Info("container image built successfully", "image", image)
+	return nil
+}
+
+// imageExists checks if a Docker image is available locally.
+func imageExists(image string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, "docker", "image", "inspect", image).Run() == nil
+}
+
+// goclawChromiumDockerfile is the embedded Dockerfile for goclaw/chromium.
+// Full Chromium with --headless=new + socat proxy on 0.0.0.0:9222.
+const goclawChromiumDockerfile = `FROM debian:bookworm-slim
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      chromium socat fonts-liberation fonts-noto-color-emoji \
+      libegl1-mesa libgl1-mesa-dri libgles2-mesa \
+      locales && \
+    sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen && \
+    rm -rf /var/lib/apt/lists/*
+ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en
+EXPOSE 9222
+ENTRYPOINT ["sh", "-c", "\
+  socat TCP4-LISTEN:9222,fork,reuseaddr TCP4:127.0.0.1:9223 & \
+  exec chromium \
+    --headless=new \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --disable-software-rasterizer \
+    --disable-dbus \
+    --disable-background-networking \
+    --disable-component-update \
+    --remote-debugging-port=9223 \
+    \"$@\"", "--"]
+`
+
+// buildGoclawChromium builds the goclaw/chromium image from the embedded Dockerfile.
+func buildGoclawChromium(image string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "build", "-t", image, "-f", "-", ".")
+	cmd.Stdin = strings.NewReader(goclawChromiumDockerfile)
+	cmd.Dir = os.TempDir() // context dir doesn't matter — Dockerfile uses no COPY/ADD
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
