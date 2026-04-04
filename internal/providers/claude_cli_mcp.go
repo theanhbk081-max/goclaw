@@ -85,6 +85,7 @@ func mcpConfigBaseDir() string {
 // BridgeContext holds per-call context for MCP bridge headers.
 type BridgeContext struct {
 	AgentID   string
+	AgentKey  string // agent string key (e.g. "steward") — needed by sessions tools
 	UserID    string
 	Channel   string
 	ChatID    string
@@ -98,10 +99,10 @@ type BridgeContext struct {
 // outside the agent's workDir so tokens are not exposed.
 // Skips write if content is unchanged. Returns the file path.
 func (d *MCPConfigData) WriteMCPConfig(ctx context.Context, sessionKey string, bc BridgeContext) string {
-	return d.writeMCPConfigInternal(ctx, sessionKey, bc.AgentID, bc.UserID, bc.Channel, bc.ChatID, bc.PeerKind, bc.Workspace, bc.TenantID)
+	return d.writeMCPConfigInternal(ctx, sessionKey, bc.AgentID, bc.AgentKey, bc.UserID, bc.Channel, bc.ChatID, bc.PeerKind, bc.Workspace, bc.TenantID)
 }
 
-func (d *MCPConfigData) writeMCPConfigInternal(ctx context.Context, sessionKey, agentID, userID, channel, chatID, peerKind, workspace, tenantID string) string {
+func (d *MCPConfigData) writeMCPConfigInternal(ctx context.Context, sessionKey, agentID, agentKey, userID, channel, chatID, peerKind, workspace, tenantID string) string {
 	if d == nil || (len(d.Servers) == 0 && d.GatewayAddr == "" && d.AgentMCPLookup == nil) {
 		return ""
 	}
@@ -132,6 +133,9 @@ func (d *MCPConfigData) writeMCPConfigInternal(ctx context.Context, sessionKey, 
 		}
 		if agentID != "" && !strings.ContainsAny(agentID, "\r\n\x00") {
 			headers["X-Agent-ID"] = agentID
+		}
+		if agentKey != "" && !strings.ContainsAny(agentKey, "\r\n\x00") {
+			headers["X-Agent-Key"] = agentKey
 		}
 		if userID != "" && !strings.ContainsAny(userID, "\r\n\x00") {
 			headers["X-User-ID"] = userID

@@ -111,6 +111,9 @@ type Loop struct {
 	cacheInvalidate   CacheInvalidateFunc // invalidate context file cache after seeding
 	userSetups        sync.Map            // userID → *userSetup (workspace + seeding state, per Loop instance)
 
+	// Bridge trace registry: passes trace context to MCP bridge for CLI tool span attribution.
+	bridgeTraceReg *mcpbridge.BridgeTraceRegistry
+
 	// Per-user MCP tools: servers requiring user credentials get connected per-request.
 	mcpStore        store.MCPServerStore  // for credential lookup
 	mcpPool         *mcpbridge.Pool       // user-keyed connection pool
@@ -312,6 +315,9 @@ type LoopConfig struct {
 	// Memory store for extractive memory fallback (writes directly when LLM flush fails)
 	MemoryStore store.MemoryStore
 
+	// Bridge trace registry: passes trace context to MCP bridge for CLI tool span attribution.
+	BridgeTraceReg *mcpbridge.BridgeTraceRegistry
+
 	// Per-user MCP tools (servers requiring per-user credentials)
 	MCPStore        store.MCPServerStore  // for credential lookup
 	MCPPool         *mcpbridge.Pool       // user-keyed connection pool
@@ -410,6 +416,7 @@ func NewLoop(cfg LoopConfig) *Loop {
 		budgetMonthlyCents:     cfg.BudgetMonthlyCents,
 		tracingStore:           cfg.TracingStore,
 		memStore:               cfg.MemoryStore,
+		bridgeTraceReg:         cfg.BridgeTraceReg,
 		mcpStore:               cfg.MCPStore,
 		mcpPool:                cfg.MCPPool,
 		mcpUserCredSrvs:        cfg.MCPUserCredSrvs,
