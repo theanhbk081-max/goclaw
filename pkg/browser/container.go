@@ -137,9 +137,9 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 	// Force English locale inside container — prevents leaking host locale
 	args = append(args, "-e", "LANG=en_US.UTF-8", "-e", "LANGUAGE=en_US:en")
 
-	// Pass proxy if configured
+	// Pass proxy if configured (strip credentials — Chrome doesn't use them)
 	if opts.ProxyURL != "" {
-		args = append(args, "-e", "CHROME_PROXY="+opts.ProxyURL)
+		args = append(args, "-e", "CHROME_PROXY="+stripUserinfo(opts.ProxyURL))
 	}
 
 	// Chrome user-data-dir flag when profile is mounted
@@ -222,8 +222,10 @@ func (e *ContainerEngine) Launch(opts LaunchOpts) error {
 		args = append(args, e.image)
 		args = append(args, chromeArgs...)
 	}
-	if opts.ProxyURL != "" {
-		args = append(args, "--proxy-server="+opts.ProxyURL)
+	// Strip credentials from proxy URL — Chrome --proxy-server doesn't support user:pass@
+	proxyForChrome := stripUserinfo(opts.ProxyURL)
+	if proxyForChrome != "" {
+		args = append(args, "--proxy-server="+proxyForChrome)
 	}
 
 	// Start container (redact proxy credentials from log)

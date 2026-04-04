@@ -28,11 +28,13 @@ type ContainerPoolEngine struct {
 
 // poolEntry tracks a single container in the pool.
 type poolEntry struct {
-	engine   *ContainerEngine
-	lastUsed time.Time
-	ready    chan struct{} // closed when launch completes
-	err      error        // set if launch failed
-	hasProxy bool         // true if container was launched with a proxy
+	engine    *ContainerEngine
+	lastUsed  time.Time
+	ready     chan struct{} // closed when launch completes
+	err       error        // set if launch failed
+	hasProxy  bool         // true if container was launched with a proxy
+	proxyUser string       // proxy auth username (for CDP Fetch auth)
+	proxyPass string       // proxy auth password (decrypted, for CDP Fetch auth)
 }
 
 // NewContainerPoolEngine creates a pool engine that manages up to maxPool containers.
@@ -105,6 +107,13 @@ func (p *ContainerPoolEngine) NewPage(ctx context.Context, url string) (Page, er
 	// timeout is typically 30s. The container stays in the pool for next request.
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("container pool: context expired while waiting for container launch (container is ready for next request): %w", ctx.Err())
+	}
+	// Inject proxy auth credentials into context for CDP Fetch-based auth
+	if entry.proxyUser != "" {
+		ctx = WithProxyAuthCreds(ctx, &ProxyAuthCreds{
+			Username: entry.proxyUser,
+			Password: entry.proxyPass,
+		})
 	}
 	return entry.engine.NewPage(ctx, url)
 }
@@ -264,14 +273,18 @@ func (p *ContainerPoolEngine) getOrCreateRetry(key, profileDir string, useProxy 
 	// Assign proxy from pool (sticky per-profile) if ProxyManager is available
 	// and the agent has opted in via use_proxy config. Default is no proxy.
 	var proxyName string
+	var proxyUser, proxyPass string
 	if pm != nil && useProxy {
 		proxy, err := pm.AssignForProfile(context.Background(), tid, profileDir, "")
 		if err == nil {
-			if fmtURL, fmtErr := pm.FormatURL(proxy); fmtErr == nil {
+			fmtURL, user, pass, fmtErr := pm.FormatURLAndCreds(proxy)
+			if fmtErr == nil {
 				proxyURL = fmtURL
+				proxyUser = user
+				proxyPass = pass
 				proxyName = proxy.Name
 				p.logger.Info("proxy pool: assigned proxy for container",
-					"key", key, "proxy", proxyName, "tenant", tid)
+					"key", key, "proxy", proxyName, "tenant", tid, "hasAuth", user != "")
 			} else {
 				p.logger.Warn("proxy pool: format URL failed, falling back to static proxy", "error", fmtErr)
 			}
@@ -287,8 +300,12 @@ func (p *ContainerPoolEngine) getOrCreateRetry(key, profileDir string, useProxy 
 	err := entry.engine.Launch(LaunchOpts{
 		ProfileDir: profileDir,
 		ProxyURL:   proxyURL,
+		ProxyUser:  proxyUser,
+		ProxyPass:  proxyPass,
 	})
 	entry.hasProxy = proxyURL != ""
+	entry.proxyUser = proxyUser
+	entry.proxyPass = proxyPass
 	entry.err = err
 	close(entry.ready)
 

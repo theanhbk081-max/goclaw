@@ -254,10 +254,13 @@ func bridgeContextMiddleware(gatewayToken string, agentStore store.AgentStore, b
 				if id, err := uuid.Parse(agentIDStr); err == nil {
 					ctx = store.WithAgentID(ctx, id)
 
-					// Lookup agent key from UUID for browser tab tracking.
+					// Lookup agent from DB to inject key + per-agent config flags.
 					if agentStore != nil {
 						if ag, err := agentStore.GetByID(ctx, id); err == nil && ag != nil {
 							ctx = store.WithAgentKey(ctx, ag.AgentKey)
+							if ag.ParseBrowserUseProxy() {
+								ctx = tools.WithBrowserUseProxy(ctx, true)
+							}
 						}
 					}
 				}

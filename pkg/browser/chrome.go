@@ -69,7 +69,7 @@ func (e *ChromeEngine) Launch(opts LaunchOpts) error {
 			l.UserDataDir(opts.ProfileDir)
 		}
 		if opts.ProxyURL != "" {
-			l.Set("proxy-server", opts.ProxyURL)
+			l.Set("proxy-server", stripUserinfo(opts.ProxyURL))
 		}
 		if len(opts.ExtensionPaths) > 0 {
 			l.Set("load-extension", strings.Join(opts.ExtensionPaths, ","))
@@ -158,6 +158,31 @@ func (e *ChromeEngine) NewPage(ctx context.Context, url string) (Page, error) {
 
 	// Bypass CSP so stealth scripts can override properties on strict pages.
 	_ = proto.PageSetBypassCSP{Enabled: true}.Call(rodPage)
+
+	// Setup CDP Fetch-based proxy authentication.
+	// Chrome's --proxy-server flag doesn't support credentials in the URL, so we
+	// intercept 407 Proxy-Auth-Required challenges via the Fetch domain and respond
+	// with the decrypted username/password.
+	if creds := proxyAuthCredsFromCtx(ctx); creds != nil {
+		_ = proto.FetchEnable{
+			HandleAuthRequests: true,
+		}.Call(rodPage)
+		go rodPage.EachEvent(func(e *proto.FetchAuthRequired) {
+			_ = proto.FetchContinueWithAuth{
+				RequestID: e.RequestID,
+				AuthChallengeResponse: &proto.FetchAuthChallengeResponse{
+					Response: proto.FetchAuthChallengeResponseResponseProvideCredentials,
+					Username: creds.Username,
+					Password: creds.Password,
+				},
+			}.Call(rodPage)
+		}, func(e *proto.FetchRequestPaused) {
+			// Resume non-auth paused requests (Fetch.enable pauses ALL requests).
+			_ = proto.FetchContinueRequest{
+				RequestID: e.RequestID,
+			}.Call(rodPage)
+		})()
+	}
 
 	// Now navigate — stealth scripts will run before page JS.
 	if url != "" && url != "about:blank" {
@@ -814,4 +839,15 @@ func (e *ChromeElement) Hover() error {
 
 func (e *ChromeElement) Input(text string) error {
 	return e.el.Input(text)
+}
+
+// stripUserinfo removes any userinfo (user:pass@) from a proxy URL so it's
+// safe for Chrome's --proxy-server flag which doesn't support credentials.
+func stripUserinfo(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	parsed.User = nil
+	return parsed.String()
 }

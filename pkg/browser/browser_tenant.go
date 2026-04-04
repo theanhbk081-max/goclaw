@@ -84,6 +84,29 @@ func useProxyFromCtx(ctx context.Context) (bool, bool) {
 	return v, ok
 }
 
+// proxyAuthCredsKey is a context key for passing proxy auth credentials to NewPage.
+type proxyAuthCredsKey struct{}
+
+// ProxyAuthCreds holds proxy authentication credentials for CDP Fetch-based auth.
+type ProxyAuthCreds struct {
+	Username string
+	Password string
+}
+
+// WithProxyAuthCreds returns a context with proxy auth credentials set.
+// Used by container pool to pass creds to ChromeEngine.NewPage for CDP Fetch auth.
+func WithProxyAuthCreds(ctx context.Context, c *ProxyAuthCreds) context.Context {
+	return context.WithValue(ctx, proxyAuthCredsKey{}, c)
+}
+
+// proxyAuthCredsFromCtx extracts proxy auth credentials from context.
+func proxyAuthCredsFromCtx(ctx context.Context) *ProxyAuthCreds {
+	if v, ok := ctx.Value(proxyAuthCredsKey{}).(*ProxyAuthCreds); ok {
+		return v
+	}
+	return nil
+}
+
 // browserProfileDirKey is a context key for passing profile directory to browser operations.
 type browserProfileDirKey struct{}
 

@@ -123,6 +123,26 @@ func (pm *ProxyManager) SetEnabled(ctx context.Context, id, tenantID string, ena
 
 // FormatURL returns "protocol://user:pass@host:port" with decrypted password.
 func (pm *ProxyManager) FormatURL(p *store.BrowserProxy) (string, error) {
+	proxyURL, user, pass, err := pm.FormatURLAndCreds(p)
+	if err != nil {
+		return "", err
+	}
+	if user == "" {
+		return proxyURL, nil
+	}
+	// Reconstruct full URL with credentials for backward compat callers.
+	parsed, parseErr := url.Parse(proxyURL)
+	if parseErr != nil {
+		return proxyURL, nil
+	}
+	parsed.User = url.UserPassword(user, pass)
+	return parsed.String(), nil
+}
+
+// FormatURLAndCreds returns the proxy URL without credentials and the decrypted
+// username/password separately. The URL is suitable for Chrome's --proxy-server
+// flag (which does not support credentials in the URL).
+func (pm *ProxyManager) FormatURLAndCreds(p *store.BrowserProxy) (proxyURL, username, password string, err error) {
 	raw := p.URL
 	// Auto-prefix http:// if no scheme — prevents url.Parse from misinterpreting
 	// "host:port" as "scheme:opaque" (Go treats text before ':' as scheme).
@@ -130,24 +150,28 @@ func (pm *ProxyManager) FormatURL(p *store.BrowserProxy) (string, error) {
 		raw = "http://" + raw
 	}
 
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return raw, nil
+	parsed, parseErr := url.Parse(raw)
+	if parseErr != nil {
+		return raw, "", "", nil
 	}
 
+	// Strip any userinfo that might be in the URL itself
+	parsed.User = nil
+	proxyURL = parsed.String()
+
 	if p.Username != "" {
-		password := p.Password
+		username = p.Username
+		password = p.Password
 		if password != "" && pm.encryptKey != "" {
-			decrypted, err := crypto.Decrypt(password, pm.encryptKey)
-			if err != nil {
-				return "", fmt.Errorf("decrypt proxy password: %w", err)
+			decrypted, decErr := crypto.Decrypt(password, pm.encryptKey)
+			if decErr != nil {
+				return "", "", "", fmt.Errorf("decrypt proxy password: %w", decErr)
 			}
 			password = decrypted
 		}
-		parsed.User = url.UserPassword(p.Username, password)
 	}
 
-	return parsed.String(), nil
+	return proxyURL, username, password, nil
 }
 
 // RunHealthCheck pings all proxies for a tenant and updates health status.

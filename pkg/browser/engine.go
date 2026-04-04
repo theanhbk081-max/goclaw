@@ -108,7 +108,9 @@ type LaunchOpts struct {
 	RemoteURL      string   // CDP endpoint for sidecar (kill on Close)
 	AttachURL      string   // CDP endpoint for existing browser (don't kill on Close)
 	BinaryPath     string   // custom browser binary (e.g. Brave, Edge, Chromium)
-	ProxyURL       string   // proxy server (e.g. "http://host:port", "socks5://host:port")
+	ProxyURL       string   // proxy server — scheme://host:port only (NO credentials)
+	ProxyUser      string   // proxy auth username (used via CDP Fetch domain)
+	ProxyPass      string   // proxy auth password (decrypted, used via CDP Fetch domain)
 	ExtensionPaths []string // --load-extension paths for Chrome extensions
 }
 
