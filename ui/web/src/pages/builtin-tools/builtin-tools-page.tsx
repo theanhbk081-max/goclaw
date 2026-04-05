@@ -19,6 +19,22 @@ const CATEGORY_ORDER = [
   "sessions", "messaging", "scheduling", "subagents", "skills", "delegation", "teams",
 ];
 
+const ALWAYS_EDITABLE = new Set(["browser"]);
+
+function hasEditableSettings(tool: BuiltinToolData): boolean {
+  if (ALWAYS_EDITABLE.has(tool.name)) return true;
+  return tool.settings != null && Object.keys(tool.settings).length > 0;
+}
+
+function getConfigHint(tool: BuiltinToolData): string | undefined {
+  return (tool.metadata as any)?.config_hint as string | undefined;
+}
+
+function isDeprecated(tool: BuiltinToolData): boolean {
+  return (tool.metadata as any)?.deprecated === true;
+}
+
+
 /** Media tool that is enabled but has no provider chain configured */
 function needsProviderConfig(tool: BuiltinToolData): boolean {
   if (!MEDIA_TOOLS.has(tool.name) || !tool.enabled) return false;
