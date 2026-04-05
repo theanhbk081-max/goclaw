@@ -165,6 +165,10 @@ type Loop struct {
 	skillEvolve        bool
 	skillNudgeInterval int // nudge every N tool calls (0 = disabled, 15 = default)
 
+	// isTeamLead indicates this agent is the lead of its primary team.
+	// Determines whether team context is injected for inbound (non-dispatch) sessions.
+	isTeamLead bool
+
 	// Config permission store for group file writer checks
 	configPermStore store.ConfigPermissionStore
 
@@ -263,9 +267,10 @@ type LoopConfig struct {
 	BrowserUseProxy bool
 
 	// Agent UUID + tenant for context propagation to tools
-	AgentUUID uuid.UUID
-	TenantID  uuid.UUID // agent's owning tenant — injected into execution context
-	AgentType string    // "open" or "predefined"
+	AgentUUID  uuid.UUID
+	TenantID   uuid.UUID // agent's owning tenant — injected into execution context
+	AgentType  string    // "open" or "predefined"
+	IsTeamLead bool      // agent leads a team (from resolver detection)
 
 	// Per-user profile + file seeding + dynamic context loading
 	EnsureUserProfile EnsureUserProfileFunc // preferred: separate profile + workspace
@@ -415,6 +420,7 @@ func NewLoop(cfg LoopConfig) *Loop {
 		selfEvolve:             cfg.SelfEvolve,
 		skillEvolve:            cfg.SkillEvolve,
 		skillNudgeInterval:     cfg.SkillNudgeInterval,
+		isTeamLead:             cfg.IsTeamLead,
 		configPermStore:        cfg.ConfigPermStore,
 		teamStore:              cfg.TeamStore,
 		secureCLIStore:         cfg.SecureCLIStore,
@@ -551,4 +557,8 @@ type runState struct {
 	// Loop detector kill flag — set when any detector triggers critical level.
 	// Propagated to RunResult.LoopKilled so the consumer can auto-fail team tasks.
 	loopKilled bool
+
+	// Truncation retry counter — caps consecutive truncation/parse-error retries
+	// to prevent burning through all iterations when max_tokens is too low.
+	truncationRetries int
 }
